@@ -10,8 +10,14 @@ def transfer(*Connection c, object msg) (
 
     string username = parts[1]
     number amount = parts[2].toNum()
+    string note = parts.trim(3, -1).join(" ")
 
-    string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ username ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ msg.user
+    if amount < 0.01 (
+        sendResponse(c, msg, "Amount must be at least 0.01")
+        return
+    )
+
+    string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ username ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ msg.user ++ "&note=" ++ note
     object resp = requests.Post(url, ADMIN_HEADERS)
 
     object body = resp.body.toStr().JsonParse().assert(object)
