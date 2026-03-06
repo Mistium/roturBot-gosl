@@ -1,0 +1,29 @@
+def transfer(*Connection c, object msg) (
+    string content = msg.content
+
+    array parts = content.split(" ")
+
+    if parts.len < 2 (
+        sendResponse(c, msg, "Usage: /transfer <username> <amount>")
+        return
+    )
+
+    log content msg
+
+    string username = parts[1]
+    number amount = parts[2].toNum()
+
+    log "Transferring " ++ amount.toStr() ++ " credits to " ++ username
+
+    string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ username ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ msg.user
+    object resp = requests.Post(url, ADMIN_HEADERS)
+
+    object body = resp.body.toStr().JsonParse().assert(object)
+
+    if body.error != null (
+        sendResponse(c, msg, body.error.toStr())
+        return
+    )
+
+    sendResponse(c, msg, "Transferred " ++ amount.toStr() ++ " credits to " ++ username)
+)

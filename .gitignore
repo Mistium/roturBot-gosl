@@ -1,2 +1,5 @@
 config.json
 .vscode
+*.go
+skills
+personalities

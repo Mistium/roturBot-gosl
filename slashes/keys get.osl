@@ -1,0 +1,33 @@
+def keys_get(*Connection c, object msg) (
+    string content = msg.content
+
+    array parts = content.split(" ")
+
+    if parts.len < 1 (
+        sendResponse(c, msg, "Usage: /keys get <keyname>")
+        return
+    )
+
+    string keyname = parts[1]
+
+    object data = getUserData(msg.user)
+
+    if data.error != null (
+        sendResponse(c, msg, data.error.toStr())
+        return
+    )
+
+    if keyname == "key" (
+        sendResponse(c, msg, "You cannot get your own key")
+        return
+    )
+
+    if !data.contains(keyname) (
+        sendResponse(c, msg, "Key not found")
+        return
+    )
+
+    any value = data[keyname]
+
+    sendResponse(c, msg, value.toStr())
+)

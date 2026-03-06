@@ -19,17 +19,22 @@ def messageHandler(*Connection c, string message) (
         case "ready"
             log "Ready to receive messages, user: " ++ (json.user.username ?? "unknown")
         case "user_connect"
-            object user = json.user
-            log "User connected: " ++ (user.username ?? "unknown")
+            // log "User connected: " ++ (user.username ?? "unknown")
         case "user_disconnect"
-            log "User disconnected: " ++ (json.username ?? "unknown")
+            // log "User disconnected: " ++ (json.username ?? "unknown")
         case "message_new"
             message_new(c, json, config.token.toStr())
         case "message_delete"
-            log "Message deleted in " ++ (json.channel ?? "unknown") + ": " ++ (json.id ?? "unknown")
+            // log "Message deleted in " ++ (json.channel ?? "unknown") + ": " ++ (json.id ?? "unknown")
+        case "message_edit"
+            // log "Message edited in " ++ (json.channel ?? "unknown") + ": " ++ (json.id ?? "unknown")
         case "typing"
-            log json.user.toStr() ++ " is typing in " ++ (json.channel ?? "unknown")
+            // log json.user.toStr() ++ " is typing in " ++ (json.channel ?? "unknown")
         case "ping"
+        case "message_react_add"
+        case "message_react_remove"
+        
+        case "channels_get"
         default
             log "Unknown command: " ++ (json.cmd ?? "unknown")
             log json
@@ -39,8 +44,12 @@ def messageHandler(*Connection c, string message) (
 def closeHandler(*Connection c) (
     log "Connection closed"
     wait 1000
-    log "Reconnecting..."
+    log "Reconnecting to " ++ (c.data.serverUrl ?? "unknown")
     "*Connection" connection = ws.Connect(c.data.serverUrl.toStr())
+    if connection == null (
+        log "Failed to reconnect"
+        return
+    )
     connection.OnMessage(messageHandler)
     connection.OnClose(closeHandler)
     connection.data.serverUrl = c.data.serverUrl

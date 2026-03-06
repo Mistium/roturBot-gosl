@@ -10,7 +10,7 @@ def message_new(*Connection c, object json, string token) (
             continue
         )
 
-        string new_content = content.trim(prefixes[i].len + 1, -1)
+        string new_content = content.trim(prefixes[i].len + 1, -1).strip()
         commands[prefixes[i]](c, {
             user,
             content: new_content,

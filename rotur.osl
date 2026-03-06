@@ -5,3 +5,19 @@ def getUserProfile(username) (
     )
     return resp.body.toStr().JsonParse()
 )
+
+def getUserData(username) (
+    object resp = requests.Get("https://api.rotur.dev/admin/get_user_by?key=username&value=" ++ username.toStr(), ADMIN_HEADERS)
+
+    if !resp.success (
+        return { error: "Request failed" }
+    )
+
+    object body = resp.body.toStr().JsonParse().assert(object)
+
+    if body.error != null (
+        return { error: body.error.toStr() }
+    )
+
+    return body
+)

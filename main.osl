@@ -11,6 +11,11 @@ object commands = {}
 object config = openObjectFile("./config.json")
 string ADMIN_TOKEN = config.admin_token ?? ""
 
+object ADMIN_HEADERS = {
+    "Authorization": ADMIN_TOKEN,
+    "Content-Type": "application/json",
+}
+
 import "./utils.osl"
 import "./validator.osl"
 import "./handler.osl"
@@ -20,6 +25,8 @@ import "./commands/hello.osl"
 import "./commands/roturacc.osl"
 
 import "./slashes/balance.osl"
+import "./slashes/transfer.osl"
+import "./slashes/keys get.osl"
 
 import "./handlers/message_new.osl"
 
@@ -29,6 +36,8 @@ mainloop:
     registerCommand("!roturacc", roturacc)
 
     registerCommand("/balance", balance)
+    registerCommand("/transfer", transfer)
+    registerCommand("/keys get", keys_get)
 
     for i servers.len (
         auto connection = ws.Connect(servers[i].toStr())
