@@ -1,0 +1,8 @@
+def generateValidator(token, validatorKey) string (
+    object resp = requests.Get("https://api.rotur.dev/generate_validator?key=" ++ validatorKey ++ "&auth=" ++ token)
+    log resp
+    if !resp.success (
+        return ""
+    )
+    return resp.body.toStr().JsonParse().validator.toStr()
+)

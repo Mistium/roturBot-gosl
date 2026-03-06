@@ -1,0 +1,8 @@
+def openObjectFile(string path) object (
+    string data = fs.ReadFile(path)
+    any parsed = data.JsonParse()
+    if typeof(parsed) != "object" (
+        return {}
+    )
+    return parsed.assert(object)
+)

@@ -1,0 +1,7 @@
+def getUserProfile(username) (
+    object resp = requests.Get("https://api.rotur.dev/profile?name=" ++ username.toStr())
+    if !resp.success (
+        return { error: "Request failed" }
+    )
+    return resp.body.toStr().JsonParse()
+)

@@ -1,0 +1,39 @@
+def roturacc(*Connection c, object msg) (
+    if msg.user != "mist" (
+        sendResponse(c, msg, "You are not allowed to use this command.")
+        return
+    )
+
+    array spl = msg.content.toStr().split(" ")
+
+    if spl.len < 2 (
+        sendResponse(c, msg, "Usage: !roturacc <username> <cmd>")
+        return
+    )
+
+    switch spl[2] (
+        case "help"
+            array lines = [
+                "!roturacc [name] update [key] [value]",
+                "!roturacc [name] remove [key]",
+                "!roturacc [name] get",
+                "!roturacc [name] size",
+                "!roturacc [name] delete",
+                "!roturacc [name] ban",
+                "!roturacc [name] refresh_token",
+                "!roturacc [name] set_standing <level> <reason>",
+                "!roturacc [name] recover_standing <reason>",
+                "!roturacc [name] standing_history",
+                "Mistium only:",
+                "!roturacc [system] get_users",
+                "!roturacc [name] token",
+                "!roturacc [name] sub <tier>",
+                "!roturacc banned_words",
+                "!roturacc [name] ban_word",
+                "!roturacc [name] unban_word",
+                "!roturacc [name] add_badge <badge>",
+                "!roturacc [name] remove_badge <badge>"
+            ]
+            sendResponse(c, msg, lines.join("\n"))
+    )
+)

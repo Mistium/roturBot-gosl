@@ -1,0 +1,61 @@
+def messageHandler(*Connection c, string message) (
+    any json_raw = message.JsonParse()
+    if typeof(json_raw) != "object" (
+        return
+    )
+    object json = json_raw.assert(object)
+    switch json.cmd (
+        case "handshake"
+            object val = json.val
+            log "Connected to " ++ (val.server.name ?? "unknown")
+            c.Send({
+                cmd: "auth",
+                validator: generateValidator(config.token, val.validator_key)
+            })
+        case "auth_success"
+            log "Authentication successful"
+        case "auth_error"
+            log "Authentication error: " ++ (json.val ?? "unknown").toStr()
+        case "ready"
+            log "Ready to receive messages, user: " ++ (json.user.username ?? "unknown")
+        case "user_connect"
+            object user = json.user
+            log "User connected: " ++ (user.username ?? "unknown")
+        case "user_disconnect"
+            log "User disconnected: " ++ (json.username ?? "unknown")
+        case "message_new"
+            message_new(c, json, config.token.toStr())
+        case "message_delete"
+            log "Message deleted in " ++ (json.channel ?? "unknown") + ": " ++ (json.id ?? "unknown")
+        case "typing"
+            log json.user.toStr() ++ " is typing in " ++ (json.channel ?? "unknown")
+        case "ping"
+        default
+            log "Unknown command: " ++ (json.cmd ?? "unknown")
+            log json
+    )
+)
+
+def closeHandler(*Connection c) (
+    log "Connection closed"
+    wait 1000
+    log "Reconnecting..."
+    "*Connection" connection = ws.Connect(c.data.serverUrl.toStr())
+    connection.OnMessage(messageHandler)
+    connection.OnClose(closeHandler)
+    connection.data.serverUrl = c.data.serverUrl
+    connections[c.data.serverUrl] = connection
+)
+
+def registerCommand(string name, any handler) (
+    commands[name] = handler
+)
+
+def sendResponse(*Connection c, object msg, string content) (
+    c.Send({
+        cmd: "message_new",
+        channel: msg.channel,
+        content: content,
+        reply_to: msg.id
+    })
+)

@@ -1,0 +1,3 @@
+def hello(*Connection c, object msg) (
+    sendResponse(c, msg, "Hello " ++ msg.user ++ "!")
+)
