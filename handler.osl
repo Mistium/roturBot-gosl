@@ -33,7 +33,7 @@ def messageHandler(*Connection c, string message) (
         case "ping"
         case "message_react_add"
         case "message_react_remove"
-        
+
         case "channels_get"
         default
             log "Unknown command: " ++ (json.cmd ?? "unknown")

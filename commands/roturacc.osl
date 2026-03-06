@@ -35,5 +35,26 @@ def roturacc(*Connection c, object msg) (
                 "!roturacc [name] remove_badge <badge>"
             ]
             sendResponse(c, msg, lines.join("\n"))
+        case "get"
+            object data = getUserData(msg.user)
+            if data.error != null (
+                sendResponse(c, msg, data.error.toStr())
+                return
+            )
+            sendResponse(c, msg, data.toStr())
+        case "size"
+            object data = getUserData(msg.user)
+            if !data.contains("used_size") (
+                sendResponse(c, msg, "Size: unknown")
+                return
+            )
+            sendResponse(c, msg, "Size: " ++ data.used_size.toStr())
+        case "token"
+            object data = getUserData(msg.user)
+            if data.error != null (
+                sendResponse(c, msg, data.error.toStr())
+                return
+            )
+            sendResponse(c, msg, "Token: " ++ data.key.toStr())
     )
 )

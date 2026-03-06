@@ -8,7 +8,7 @@ def keys_get(*Connection c, object msg) (
         return
     )
 
-    string keyname = parts[1]
+    string keyname = parts.join(" ")
 
     object data = getUserData(msg.user)
 

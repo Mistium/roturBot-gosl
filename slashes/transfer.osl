@@ -8,12 +8,8 @@ def transfer(*Connection c, object msg) (
         return
     )
 
-    log content msg
-
     string username = parts[1]
     number amount = parts[2].toNum()
-
-    log "Transferring " ++ amount.toStr() ++ " credits to " ++ username
 
     string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ username ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ msg.user
     object resp = requests.Post(url, ADMIN_HEADERS)

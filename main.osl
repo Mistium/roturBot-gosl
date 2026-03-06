@@ -26,7 +26,9 @@ import "./commands/roturacc.osl"
 
 import "./slashes/balance.osl"
 import "./slashes/transfer.osl"
+
 import "./slashes/keys get.osl"
+import "./slashes/keys set.osl"
 
 import "./handlers/message_new.osl"
 
@@ -37,7 +39,9 @@ mainloop:
 
     registerCommand("/balance", balance)
     registerCommand("/transfer", transfer)
+    
     registerCommand("/keys get", keys_get)
+    registerCommand("/keys set", keys_set)
 
     for i servers.len (
         auto connection = ws.Connect(servers[i].toStr())
