@@ -6,3 +6,25 @@ def openObjectFile(string path) object (
     )
     return parsed.assert(object)
 )
+
+def rawToMsg(object raw) object (
+    object msg = raw.message.assert(object)
+    return {
+        user: msg.user,
+        content: msg.content,
+        channel: raw.channel,
+        id: msg.id
+    }
+)
+
+def randomString(number) string (
+    string out = ""
+    for i number (
+        out += randomChar()
+    )
+    return out
+)
+
+def randomChar() string (
+    return "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[random(0, 62)].toStr()
+)

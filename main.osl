@@ -4,6 +4,8 @@ import "osl/fs"
 
 string API_BASE = "https://api.rotur.dev"
 
+array recent_message_listeners = []
+object recent_listened_messages = {}
 object connections = {}
 array servers = ["wss://chats.mistium.com", "wss://dms.mistium.com"]
 object commands = {}
@@ -39,7 +41,7 @@ mainloop:
 
     registerCommand("/balance", balance)
     registerCommand("/transfer", transfer)
-    
+
     registerCommand("/keys get", keys_get)
     registerCommand("/keys set", keys_set)
 
