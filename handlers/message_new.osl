@@ -1,17 +1,13 @@
 def message_new(*Connection c, object json, string token) (
-    object msg = json.message
-    string content = msg.content
+  object msg = json.message
+  string content = msg.content
 
-    if content.contains("@roturBOT") (
-        object replyMsg = sendReply(c, rawToMsg(json), "hi!")
-        log replyMsg
-        for i 10 (
-            log i
-            editMessage(c, replyMsg, "hi! " ++ i.toStr())
-            wait 1
-        )
-        return
-    )
+  addMessageToCache(json.channel.toStr(), msg)
+
+  if content.contains("@roturBOT") (
+    handleAIQuery(c, rawToMsg(json))
+    return
+  )
 
     array prefixes = commands.getKeys()
     for i prefixes.len (

@@ -11,6 +11,7 @@ def messageHandler(*Connection c, string message) (
             recent_message_listeners.shift()
         )
     )
+    log json.cmd
     switch json.cmd (
         case "handshake"
             object val = json.val
@@ -56,12 +57,12 @@ def getListenedMessage(string listener) object (
     )
     object data = recent_listened_messages[listener]
     recent_listened_messages.delete(listener)
-    return data
+    return rawToMsg(data)
 )
 
 def closeHandler(*Connection c) (
     log "Connection closed"
-    wait 1000
+    wait 10
     log "Reconnecting to " ++ (c.data.serverUrl ?? "unknown")
     "*Connection" connection = ws.Connect(c.data.serverUrl.toStr())
     if connection == null (
@@ -79,10 +80,11 @@ def registerCommand(string name, any handler) (
 )
 
 def sendResponse(*Connection c, object msg, string content) object (
+    object data = rawToMsg(msg)
     string listener = randomString(20)
     c.Send({
         cmd: "message_new",
-        channel: msg.channel,
+        channel: data.channel,
         content: content,
         listener: listener
     })
@@ -93,12 +95,13 @@ def sendResponse(*Connection c, object msg, string content) object (
 )
 
 def sendReply(*Connection c, object msg, string content) object (
+    object data = rawToMsg(msg)
     string listener = randomString(20)
     c.Send({
         cmd: "message_new",
-        channel: msg.channel,
+        channel: data.channel,
         content: content,
-        reply_to: msg.id,
+        reply_to: data.id,
         listener: listener
     })
     while !recent_message_listeners.contains(listener) (
@@ -108,11 +111,12 @@ def sendReply(*Connection c, object msg, string content) object (
 )
 
 def editMessage(*Connection c, object msg, string content) object (
+    object data = rawToMsg(msg)
     string listener = randomString(20)
     c.Send({
         cmd: "message_edit",
-        channel: msg.channel,
-        id: msg.id,
+        channel: data.channel,
+        id: data.id,
         content: content,
         listener: listener
     })

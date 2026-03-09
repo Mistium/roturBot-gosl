@@ -8,12 +8,16 @@ def openObjectFile(string path) object (
 )
 
 def rawToMsg(object raw) object (
-    object msg = raw.message.assert(object)
+    any rawmsg = raw.message
+    object msg = {}
+    if typeof(rawmsg) == "object" (
+        msg = rawmsg.assert(object)
+    )
     return {
-        user: msg.user,
-        content: msg.content,
+        user: raw.user ?? msg.user,
+        content: raw.content ?? msg.content,
         channel: raw.channel,
-        id: msg.id
+        id: raw.id ?? msg.id
     }
 )
 

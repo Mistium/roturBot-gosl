@@ -1,0 +1,108 @@
+def handleAIQuery(*Connection c, object msg) (
+  object user_data = validateUser(msg.user.toStr())
+  
+  if user_data.error != null (
+    sendReply(c, msg, user_data.error.toStr())
+    return
+  )
+  
+  string tier = user_data.tier ?? "Free"
+  
+  if tier == "Free" (
+    sendReply(c, msg, "Only subscribers can use this feature. Subscribe at https://ko-fi.com/mistium or use /subscribe to get Lite.")
+    return
+  )
+  
+  object reply_msg = sendReply(c, msg, "waiting for ai...")
+  
+  string personality_name = getUserPersonality(msg.user.toStr())
+  string personality = getPersonalityPrompt(personality_name)
+  
+  array messages = buildAIMessages(user_data.user.assert(object), msg.content.toStr(), personality, msg.channel.toStr())
+
+  object response = queryAI(messages, tier)
+  
+  if response.error != null (
+    editMessage(c, reply_msg, "Sorry, I encountered an error: " ++ response.error.toStr())
+    return
+  )
+  
+  processResponse(c, reply_msg, response, tier)
+)
+
+def validateUser(string discord_id) object (
+  object user = getUserProfile(discord_id)
+  
+  if user.error != null (
+    return { error: user.error.toStr() }
+  )
+  
+  object full_user = getUserData(user.username ?? discord_id)
+  
+  if full_user.error != null (
+    return { error: full_user.error.toStr() }
+  )
+  
+  object subscription = (full_user["sys.subscription"] ?? {}).assert(object)
+  string tier = (subscription["tier"] ?? "Free").toStr()
+  
+  return {
+    user: full_user,
+    tier: tier
+  }
+)
+
+def buildAIMessages(object user, string prompt, string personality, string channel_id) array (
+  array messages = []
+  
+  messages.append({
+    role: "system",
+    content: personality
+  })
+  
+  string user_context = "You are talking to the rotur user named: " ++ (user.username ?? "someone")
+  user_context ++= ". On discord they are " ++ (user.discord_id ?? "unknown")
+  user_context ++= " with display name: " ++ (user.display_name ?? user.username ?? "unknown")
+  user_context ++= ". You are chatting in " ++ channel_id ++ "."
+  
+  messages.append({
+    role: "system",
+    content: user_context
+  })
+
+  string history = getMessageHistory(channel_id)
+  if history.len > 0 (
+    messages.append({
+      role: "system",
+      content: "RECENT CHANNEL CONTEXT (last 40 messages):\n\n" ++ history
+    })
+  )
+  
+  messages.append({
+    role: "user",
+    content: prompt
+  })
+  
+  return messages
+)
+
+def processResponse(*Connection c, object reply_msg, object response, string tier) (
+  string content = response.choices[1].message.content ?? ""
+  
+  if content.len == 0 (
+    editMessage(c, reply_msg, "Sorry, I couldn't generate a response to that.")
+    return
+  )
+  
+  content = sanitizeContent(content)
+  
+  if tier == "Lite" (
+    content = "(Lite - gpt-oss-120b)\n" ++ content
+  )
+  
+  if content.len > 2000 (
+    content = content.trim(0, 1997) ++ "..."
+  )
+  
+  editMessage(c, reply_msg, content)
+)

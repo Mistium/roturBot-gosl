@@ -1,0 +1,18 @@
+def sanitizeContent(string content) string (
+  content = content.replace("@", "@ ")
+  
+  return content
+)
+
+def formatThinkingTime(number start_time) string (
+  number elapsed = (timestamp - start_time) / 1000
+  
+  if elapsed < 60 (
+    return floor(elapsed).toStr() ++ "s"
+  )
+  
+  number minutes = floor(elapsed / 60)
+  number seconds = floor(elapsed % 60)
+  
+  return minutes.toStr() ++ "m " ++ seconds.toStr() ++ "s"
+)

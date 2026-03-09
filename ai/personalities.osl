@@ -1,0 +1,25 @@
+def loadPersonalities() object (
+  return { "roturbot": getDefaultPersonality() }
+)
+
+def getPersonalityPrompt(string name) string (
+  string file_path = "./personalities/" ++ name ++ ".md"
+  string content = fs.ReadFile(file_path)
+  
+  if content.len > 0 (
+    return content
+  )
+  
+  return getDefaultPersonality()
+)
+
+def getDefaultPersonality() string (
+  string default_path = "./personalities/roturbot.md"
+  string content = fs.ReadFile(default_path)
+  
+  if content.len > 0 (
+    return content
+  )
+  
+  return "You are roturBOT, a helpful AI assistant for the Rotur platform. Be friendly, concise, and helpful."
+)

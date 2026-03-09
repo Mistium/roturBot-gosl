@@ -1,0 +1,58 @@
+def queryAI(array messages, string tier) object (
+  string api_key = (config["vercel-api"] ?? "").toStr()
+  
+  if api_key.len == 0 (
+    return { error: "API key not configured" }
+  )
+  
+  // string url = "https://ai-gateway.vercel.sh/v1/chat/completions"
+  string url = "https://integrate.api.nvidia.com/v1/chat/completions"
+  api_key = (config["nvidia-api"] ?? api_key).toStr()
+  // string model = "zai/glm-4.7" - vercel id
+  string model = "z-ai/glm4.7"
+  
+  if tier == "Lite" or true (
+    model = "openai/gpt-oss-120b"
+  )
+  
+  object body = {
+    model: model,
+    messages: messages,
+    temperature: 1,
+    top_p: 1,
+    max_tokens: 16384
+  }
+  
+  object response = requests.Post(url, {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer " ++ api_key,
+    "body": body
+  })
+  
+  if !response.success (
+    return { error: "API request failed" }
+  )
+
+  if response.status != 200 (
+    return { error: "API request failed with status " ++ response.status.toStr() }
+  )
+
+  any parsedRaw = response.body.toStr().JsonParse()
+
+  if typeof(parsedRaw) != "object" (
+    return { error: "Invalid response format" }
+  )
+
+  object parsed = parsedRaw.assert(object)
+  
+  if parsed.error != null (
+    string error = parsed.error.toStr()
+    return { error }
+  )
+  
+  if !parsed.contains("choices") (
+    return { error: "Invalid response format" }
+  )
+  
+  return parsed
+)

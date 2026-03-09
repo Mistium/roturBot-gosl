@@ -9,6 +9,8 @@ object recent_listened_messages = {}
 object connections = {}
 array servers = ["wss://chats.mistium.com", "wss://dms.mistium.com"]
 object commands = {}
+object channel_messages = {}
+object user_personalities = {}
 
 object config = openObjectFile("./config.json")
 string ADMIN_TOKEN = config.admin_token ?? ""
@@ -18,10 +20,16 @@ object ADMIN_HEADERS = {
     "Content-Type": "application/json",
 }
 
+import "./ai/ai.osl"
+import "./ai/vercel.osl"
+import "./ai/personalities.osl"
+
 import "./utils.osl"
 import "./validator.osl"
 import "./handler.osl"
 import "./rotur.osl"
+import "./message_cache.osl"
+import "./helpers.osl"
 
 import "./commands/hello.osl"
 import "./commands/roturacc.osl"
@@ -31,6 +39,7 @@ import "./slashes/transfer.osl"
 
 import "./slashes/keys get.osl"
 import "./slashes/keys set.osl"
+import "./slashes/personality.osl"
 
 import "./handlers/message_new.osl"
 
@@ -42,8 +51,9 @@ mainloop:
     registerCommand("/balance", balance)
     registerCommand("/transfer", transfer)
 
-    registerCommand("/keys get", keys_get)
-    registerCommand("/keys set", keys_set)
+registerCommand("/keys get", keys_get)
+registerCommand("/keys set", keys_set)
+registerCommand("/personality", personality)
 
     for i servers.len (
         auto connection = ws.Connect(servers[i].toStr())
