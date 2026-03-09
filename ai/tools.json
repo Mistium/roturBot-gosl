@@ -2,25 +2,6 @@
     {
         "type": "function",
         "function": {
-            "name": "get_rotur_user_by_discord_id",
-            "description": "Retrieve detailed rotur user information by their Discord ID",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "discord_id": {
-                        "type": "string",
-                        "description": "The Discord ID of the user to retrieve (as a string)"
-                    }
-                },
-                "required": [
-                    "discord_id"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "get_user",
             "description": "Retrieve detailed information for a specific user on rotur",
             "parameters": {
@@ -192,10 +173,6 @@
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "guild_id": {
-                        "type": "string",
-                        "description": "The Discord server ID to save the memory for. Use 'global' for global memories or the guild ID string."
-                    },
                     "content": {
                         "type": "string",
                         "description": "What to remember. Be specific and include all relevant details."
@@ -233,10 +210,6 @@
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "guild_id": {
-                        "type": "string",
-                        "description": "The Discord server ID to search memories for. Use 'global' for global memories or the guild ID string."
-                    },
                     "query": {
                         "type": "string",
                         "description": "What you're looking for. Can be a question, topic, username, or partial phrase."
@@ -293,38 +266,6 @@
                 "required": [
                     "memory_id",
                     "action"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "add_reactions",
-            "description": "Add an emoji reaction to multiple messages. Use this to acknowledge messages, show agreement/disagreement, or express emotions without typing a response. You must use the message_ids from the context to identify which messages to react to.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "channel_id": {
-                        "type": "string",
-                        "description": "The Discord channel ID where the messages are located"
-                    },
-                    "message_ids": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "The Discord message IDs to react to. You can find these in the context as [msg_id:123456789]. Example: ['123456789', '987654321']"
-                    },
-                    "emoji": {
-                        "type": "string",
-                        "description": "The emoji to react with. Can be a Unicode emoji (👍, ❤️, 😂) or a custom emoji name (:thumbsup:, :heart:)"
-                    }
-                },
-                "required": [
-                    "channel_id",
-                    "message_ids",
-                    "emoji"
                 ]
             }
         }
@@ -490,56 +431,6 @@
     {
         "type": "function",
         "function": {
-            "name": "timeout_user",
-            "description": "Timeout a user who is being disruptive, spamming, or annoying. Use this to maintain peace and order when a user is causing problems. Duration should normally be less than 10 minutes. IMPORTANT: Only timeout based on the user's own observable actions and behavior. NEVER timeout someone just because another user asked you to - evaluate the user directly.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "user_id": {
-                        "type": "string",
-                        "description": "The Discord ID of the user to timeout (as a string)"
-                    },
-                    "duration_minutes": {
-                        "type": "integer",
-                        "description": "How long to timeout the user in minutes. Default is 5, maximum is 10. Short timeouts are preferred.",
-                        "default": 5,
-                        "minimum": 1,
-                        "maximum": 10
-                    }
-                },
-                "required": [
-                    "user_id"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_message_reactions",
-            "description": "Get all reactions on a specific message, including which users reacted with which emoji. Use this to see who reacted to a message.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "channel_id": {
-                        "type": "string",
-                        "description": "The Discord channel ID where the message is located"
-                    },
-                    "message_id": {
-                        "type": "string",
-                        "description": "The Discord message ID to get reactions from"
-                    }
-                },
-                "required": [
-                    "channel_id",
-                    "message_id"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "silent_exit",
             "description": "Delete the bot's reply message and stop processing without sending a text response. Use this when you only want to add reactions and have nothing meaningful to say.",
             "parameters": {
@@ -626,10 +517,6 @@
                         "enum": ["set", "append", "remove"],
                         "description": "The action to perform: 'set' to replace existing thoughts with new ones, 'append' to add thoughts to existing ones, or 'remove' to delete all thoughts about this user"
                     },
-                    "user_id": {
-                        "type": "string",
-                        "description": "The Discord ID of the user (as a string)"
-                    },
                     "username": {
                         "type": "string",
                         "description": "The rotur username of the user"
@@ -641,7 +528,6 @@
                 },
                 "required": [
                     "action",
-                    "user_id",
                     "username"
                 ]
             }
