@@ -1,7 +1,7 @@
 def generateValidator(token, validatorKey) string (
-    object resp = requests.Get("https://api.rotur.dev/generate_validator?key=" ++ validatorKey ++ "&auth=" ++ token)
-    if !resp.success (
-        return ""
-    )
-    return resp.body.toStr().JsonParse().validator.toStr()
+  object resp = requests.Get("https://api.rotur.dev/generate_validator?key=" ++ validatorKey ++ "&auth=" ++ token)
+  if !resp.success (
+    return ""
+  )
+  return resp.body.toStr().JsonParse().validator.toStr()
 )

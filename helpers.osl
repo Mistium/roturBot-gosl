@@ -8,7 +8,7 @@ def formatThinkingTime(number start_time) string (
   number elapsed = (timestamp - start_time) / 1000
   
   if elapsed < 60 (
-    return floor(elapsed).toStr() ++ "s"
+  return floor(elapsed).toStr() ++ "s"
   )
   
   number minutes = floor(elapsed / 60)

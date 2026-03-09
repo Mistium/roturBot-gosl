@@ -5,19 +5,19 @@ def message_new(*Connection c, object json, string token) (
   addMessageToCache(json.channel.toStr(), msg)
 
   if content.contains("@roturBOT") (
-    handleAIQuery(c, rawToMsg(json))
-    return
+  handleAIQuery(c, rawToMsg(json))
+  return
   )
 
-    array prefixes = commands.getKeys()
-    for i prefixes.len (
-        if !content.startsWith(prefixes[i].toStr()) (
-            continue
-        )
-
-        string new_content = content.trim(prefixes[i].len + 1, -1).strip()
-        object msg = rawToMsg(json)
-        msg.content = new_content
-        commands[prefixes[i]](c, msg)
+  array prefixes = commands.getKeys()
+  for i prefixes.len (
+    if !content.startsWith(prefixes[i].toStr()) (
+      continue
     )
+
+    string new_content = content.trim(prefixes[i].len + 1, -1).strip()
+    object msg = rawToMsg(json)
+    msg.content = new_content
+    commands[prefixes[i]](c, msg)
+  )
 )

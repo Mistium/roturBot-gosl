@@ -1,56 +1,56 @@
 def getUserProfile(username) object (
-    object resp = requests.Get("https://api.rotur.dev/profile?name=" ++ username.toStr())
-    if !resp.success (
-        return { error: "Request failed" }
-    )
-    any parsed = resp.body.toStr().JsonParse()
-    if typeof(parsed) != "object" (
-        return { error: "Invalid response" }
-    )
-    return parsed.assert(object)
+  object resp = requests.Get("https://api.rotur.dev/profile?name=" ++ username.toStr())
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
 )
 
 def getUserData(username) object (
-    object resp = requests.Get("https://api.rotur.dev/admin/get_user_by?key=username&value=" ++ username.toStr(), ADMIN_HEADERS)
+  object resp = requests.Get("https://api.rotur.dev/admin/get_user_by?key=username&value=" ++ username.toStr(), ADMIN_HEADERS)
 
-    if !resp.success (
-        return { error: "Request failed" }
-    )
+  if !resp.success (
+    return { error: "Request failed" }
+  )
 
-    object body = resp.body.toStr().JsonParse().assert(object)
+  object body = resp.body.toStr().JsonParse().assert(object)
 
-    if body.error != null (
-        return { error: body.error.toStr() }
-    )
+  if body.error != null (
+    return { error: body.error.toStr() }
+  )
 
-    if typeof(body) != "object" (
-        return { error: "Invalid response" }
-    )
+  if typeof(body) != "object" (
+    return { error: "Invalid response" }
+  )
 
-    return body
+  return body
 )
 
 def getUserFileSize(token) number (
-    object resp = requests.Get("https://api.rotur.dev/files/usage?auth=" ++ token)
-    if !resp.success (
-        return 0
-    )
-    return resp.body.toStr().JsonParse().size.toNum()
+  object resp = requests.Get("https://api.rotur.dev/files/usage?auth=" ++ token)
+  if !resp.success (
+    return 0
+  )
+  return resp.body.toStr().JsonParse().size.toNum()
 )
 
 def users_patch(auth, key, value) object (
-    object resp = requests.Patch("https://api.rotur.dev/users", {
-        "content-type": "application/json",
-        "body": {
-            "auth": auth,
-            "key": key,
-            "value": value
-        }
-    })
+  object resp = requests.Patch("https://api.rotur.dev/users", {
+    "content-type": "application/json",
+    "body": {
+      "auth": auth,
+      "key": key,
+      "value": value
+    }
+  })
 
-    if !resp.success (
-        return { error: "Request failed" }
-    )
+  if !resp.success (
+    return { error: "Request failed" }
+  )
 
-    return resp.body.toStr().JsonParse().assert(object)
+  return resp.body.toStr().JsonParse().assert(object)
 )

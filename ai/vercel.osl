@@ -1,34 +1,32 @@
-def queryAI(array messages, string tier) object (
+def queryAI(array messages, string tier, bool use_tools, array tools) object (
   string api_key = (config["vercel-api"] ?? "").toStr()
-  
+
   if api_key.len == 0 (
     return { error: "API key not configured" }
   )
-  
-  // string url = "https://ai-gateway.vercel.sh/v1/chat/completions"
-  string url = "https://integrate.api.nvidia.com/v1/chat/completions"
+
   api_key = (config["nvidia-api"] ?? api_key).toStr()
-  // string model = "zai/glm-4.7" - vercel id
-  string model = "z-ai/glm4.7"
-  
-  if tier == "Lite" or true (
-    model = "openai/gpt-oss-120b"
-  )
-  
+  string model_to_use = "openai/gpt-oss-120b"
+
   object body = {
-    model: model,
+    model: model_to_use,
     messages: messages,
     temperature: 1,
     top_p: 1,
     max_tokens: 16384
   }
-  
-  object response = requests.Post(url, {
+
+  if use_tools and tools.len > 0 (
+    body.tools = tools
+    body.parallel_tool_calls = true
+  )
+
+  object response = requests.Post("https://integrate.api.nvidia.com/v1/chat/completions", {
     "Content-Type": "application/json",
     "Authorization": "Bearer " ++ api_key,
     "body": body
   })
-  
+
   if !response.success (
     return { error: "API request failed" }
   )
@@ -44,15 +42,14 @@ def queryAI(array messages, string tier) object (
   )
 
   object parsed = parsedRaw.assert(object)
-  
+
   if parsed.error != null (
-    string error = parsed.error.toStr()
-    return { error }
+    return { error: parsed.error.toStr() }
   )
-  
+
   if !parsed.contains("choices") (
     return { error: "Invalid response format" }
   )
-  
+
   return parsed
 )

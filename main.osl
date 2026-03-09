@@ -16,13 +16,14 @@ object config = openObjectFile("./config.json")
 string ADMIN_TOKEN = config.admin_token ?? ""
 
 object ADMIN_HEADERS = {
-    "Authorization": ADMIN_TOKEN,
-    "Content-Type": "application/json",
+  "Authorization": ADMIN_TOKEN,
+  "Content-Type": "application/json",
 }
 
 import "./ai/ai.osl"
 import "./ai/vercel.osl"
 import "./ai/personalities.osl"
+import "./ai/tools.osl"
 
 import "./utils.osl"
 import "./validator.osl"
@@ -45,24 +46,27 @@ import "./handlers/message_new.osl"
 
 mainloop:
 
-    registerCommand("!hello", hello)
-    registerCommand("!roturacc", roturacc)
+  registerCommand("!hello", hello)
+  registerCommand("!roturacc", roturacc)
 
-    registerCommand("/balance", balance)
-    registerCommand("/transfer", transfer)
+  registerCommand("/balance", balance)
+  registerCommand("/transfer", transfer)
 
-registerCommand("/keys get", keys_get)
-registerCommand("/keys set", keys_set)
-registerCommand("/personality", personality)
+  registerCommand("/keys get", keys_get)
+  registerCommand("/keys set", keys_set)
+  registerCommand("/personality", personality)
 
-    for i servers.len (
-        auto connection = ws.Connect(servers[i].toStr())
-        connection.OnMessage(messageHandler)
-        connection.OnClose(closeHandler)
-        connection.data.serverUrl = servers[i]
-        connections[servers[i]] = connection
+  for i servers.len (
+    auto connection = ws.Connect(servers[i].toStr())
+    if connection == null (
+      continue
     )
+    connection.OnMessage(messageHandler)
+    connection.OnClose(closeHandler)
+    connection.data.serverUrl = servers[i]
+    connections[servers[i]] = connection
+  )
 
-    while true (
-        wait 100
-    )
+  while true (
+    wait 100
+  )

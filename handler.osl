@@ -1,127 +1,127 @@
 def messageHandler(*Connection c, string message) (
-    any json_raw = message.JsonParse()
-    if typeof(json_raw) != "object" (
-        return
+  any json_raw = message.JsonParse()
+  if typeof(json_raw) != "object" (
+    return
+  )
+  object json = json_raw.assert(object)
+  if json.listener != null (
+    recent_listened_messages[json.listener] = json
+    recent_message_listeners.append(json.listener)
+    if recent_message_listeners.len > 1000 (
+      recent_message_listeners.shift()
     )
-    object json = json_raw.assert(object)
-    if json.listener != null (
-        recent_listened_messages[json.listener] = json
-        recent_message_listeners.append(json.listener)
-        if recent_message_listeners.len > 1000 (
-            recent_message_listeners.shift()
-        )
-    )
-    log json.cmd
-    switch json.cmd (
-        case "handshake"
-            object val = json.val
-            log "Connected to " ++ (val.server.name ?? "unknown")
-            c.Send({
-                cmd: "auth",
-                validator: generateValidator(config.token, val.validator_key)
-            })
-        case "auth_success"
-            log "Authentication successful"
-        case "auth_error"
-            log "Authentication error: " ++ (json.val ?? "unknown").toStr()
-        case "ready"
-            log "Ready to receive messages, user: " ++ (json.user.username ?? "unknown")
-        case "user_connect"
-            // log "User connected: " ++ (user.username ?? "unknown")
-        case "user_disconnect"
-            // log "User disconnected: " ++ (json.username ?? "unknown")
-        case "message_new"
-            message_new(c, json, config.token.toStr())
-        case "message_delete"
-            // log "Message deleted in " ++ (json.channel ?? "unknown") + ": " ++ (json.id ?? "unknown")
-        case "message_edit"
-            // log "Message edited in " ++ (json.channel ?? "unknown") + ": " ++ (json.id ?? "unknown")
-        case "typing"
-            // log json.user.toStr() ++ " is typing in " ++ (json.channel ?? "unknown")
-        case "ping"
-        case "message_react_add"
-        case "message_react_remove"
+  )
+  log json.cmd
+  switch json.cmd (
+    case "handshake"
+      object val = json.val
+      log "Connected to " ++ (val.server.name ?? "unknown")
+      c.Send({
+        cmd: "auth",
+        validator: generateValidator(config.token, val.validator_key)
+      })
+    case "auth_success"
+      log "Authentication successful"
+    case "auth_error"
+      log "Authentication error: " ++ (json.val ?? "unknown").toStr()
+    case "ready"
+      log "Ready to receive messages, user: " ++ (json.user.username ?? "unknown")
+    case "user_connect"
+      // log "User connected: " ++ (user.username ?? "unknown")
+    case "user_disconnect"
+      // log "User disconnected: " ++ (json.username ?? "unknown")
+    case "message_new"
+      message_new(c, json, config.token.toStr())
+    case "message_delete"
+      // log "Message deleted in " ++ (json.channel ?? "unknown") + ": " ++ (json.id ?? "unknown")
+    case "message_edit"
+      // log "Message edited in " ++ (json.channel ?? "unknown") + ": " ++ (json.id ?? "unknown")
+    case "typing"
+      // log json.user.toStr() ++ " is typing in " ++ (json.channel ?? "unknown")
+    case "ping"
+    case "message_react_add"
+    case "message_react_remove"
 
-        case "channels_get"
+    case "channels_get"
 
-        case "error"
-        default
-            log "Unknown command: " ++ (json.cmd ?? "unknown")
-            log json
-    )
+    case "error"
+    default
+      log "Unknown command: " ++ (json.cmd ?? "unknown")
+      log json
+  )
 )
 
 def getListenedMessage(string listener) object (
-    if !recent_listened_messages.contains(listener) (
-        return null
-    )
-    object data = recent_listened_messages[listener]
-    recent_listened_messages.delete(listener)
-    return rawToMsg(data)
+  if !recent_listened_messages.contains(listener) (
+    return null
+  )
+  object data = recent_listened_messages[listener]
+  recent_listened_messages.delete(listener)
+  return rawToMsg(data)
 )
 
 def closeHandler(*Connection c) (
-    log "Connection closed"
-    wait 10
-    log "Reconnecting to " ++ (c.data.serverUrl ?? "unknown")
-    "*Connection" connection = ws.Connect(c.data.serverUrl.toStr())
-    if connection == null (
-        log "Failed to reconnect"
-        return
-    )
-    connection.OnMessage(messageHandler)
-    connection.OnClose(closeHandler)
-    connection.data.serverUrl = c.data.serverUrl
-    connections[c.data.serverUrl] = connection
+  log "Connection closed"
+  wait 10
+  log "Reconnecting to " ++ (c.data.serverUrl ?? "unknown")
+  "*Connection" connection = ws.Connect(c.data.serverUrl.toStr())
+  if connection == null (
+    log "Failed to reconnect"
+    return
+  )
+  connection.OnMessage(messageHandler)
+  connection.OnClose(closeHandler)
+  connection.data.serverUrl = c.data.serverUrl
+  connections[c.data.serverUrl] = connection
 )
 
 def registerCommand(string name, any handler) (
-    commands[name] = handler
+  commands[name] = handler
 )
 
 def sendResponse(*Connection c, object msg, string content) object (
-    object data = rawToMsg(msg)
-    string listener = randomString(20)
-    c.Send({
-        cmd: "message_new",
-        channel: data.channel,
-        content: content,
-        listener: listener
-    })
-    while !recent_message_listeners.contains(listener) (
-        wait 0.1
-    )
-    return getListenedMessage(listener)
+  object data = rawToMsg(msg)
+  string listener = randomString(20)
+  c.Send({
+    cmd: "message_new",
+    channel: data.channel,
+    content: content,
+    listener: listener
+  })
+  while !recent_message_listeners.contains(listener) (
+    wait 0.1
+  )
+  return getListenedMessage(listener)
 )
 
 def sendReply(*Connection c, object msg, string content) object (
-    object data = rawToMsg(msg)
-    string listener = randomString(20)
-    c.Send({
-        cmd: "message_new",
-        channel: data.channel,
-        content: content,
-        reply_to: data.id,
-        listener: listener
-    })
-    while !recent_message_listeners.contains(listener) (
-        wait 0.1
-    )
-    return getListenedMessage(listener)
+  object data = rawToMsg(msg)
+  string listener = randomString(20)
+  c.Send({
+    cmd: "message_new",
+    channel: data.channel,
+    content: content,
+    reply_to: data.id,
+    listener: listener
+  })
+  while !recent_message_listeners.contains(listener) (
+    wait 0.1
+  )
+  return getListenedMessage(listener)
 )
 
 def editMessage(*Connection c, object msg, string content) object (
-    object data = rawToMsg(msg)
-    string listener = randomString(20)
-    c.Send({
-        cmd: "message_edit",
-        channel: data.channel,
-        id: data.id,
-        content: content,
-        listener: listener
-    })
-    while !recent_message_listeners.contains(listener) (
-        wait 0.1
-    )
-    return getListenedMessage(listener)
+  object data = rawToMsg(msg)
+  string listener = randomString(20)
+  c.Send({
+    cmd: "message_edit",
+    channel: data.channel,
+    id: data.id,
+    content: content,
+    listener: listener
+  })
+  while !recent_message_listeners.contains(listener) (
+    wait 0.1
+  )
+  return getListenedMessage(listener)
 )

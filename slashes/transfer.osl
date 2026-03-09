@@ -1,31 +1,31 @@
 def transfer(*Connection c, object msg) (
-    string content = msg.content
+  string content = msg.content
 
-    array parts = content.split(" ")
+  array parts = content.split(" ")
 
-    if parts.len < 2 (
-        sendResponse(c, msg, "Usage: /transfer <username> <amount>")
-        return
-    )
+  if parts.len < 2 (
+    sendResponse(c, msg, "Usage: /transfer <username> <amount>")
+    return
+  )
 
-    string username = parts[1]
-    number amount = parts[2].toNum()
-    string note = parts.trim(3, -1).join(" ")
+  string username = parts[1]
+  number amount = parts[2].toNum()
+  string note = parts.trim(3, -1).join(" ")
 
-    if amount < 0.01 (
-        sendResponse(c, msg, "Amount must be at least 0.01")
-        return
-    )
+  if amount < 0.01 (
+    sendResponse(c, msg, "Amount must be at least 0.01")
+    return
+  )
 
-    string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ username ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ msg.user ++ "&note=" ++ note
-    object resp = requests.Post(url, ADMIN_HEADERS)
+  string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ username ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ msg.user ++ "&note=" ++ note
+  object resp = requests.Post(url, ADMIN_HEADERS)
 
-    object body = resp.body.toStr().JsonParse().assert(object)
+  object body = resp.body.toStr().JsonParse().assert(object)
 
-    if body.error != null (
-        sendResponse(c, msg, body.error.toStr())
-        return
-    )
+  if body.error != null (
+    sendResponse(c, msg, body.error.toStr())
+    return
+  )
 
-    sendResponse(c, msg, "Transferred " ++ amount.toStr() ++ " credits to " ++ username)
+  sendResponse(c, msg, "Transferred " ++ amount.toStr() ++ " credits to " ++ username)
 )

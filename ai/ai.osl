@@ -1,51 +1,51 @@
 def handleAIQuery(*Connection c, object msg) (
   object user_data = validateUser(msg.user.toStr())
-  
+
   if user_data.error != null (
     sendReply(c, msg, user_data.error.toStr())
     return
   )
-  
+
   string tier = user_data.tier ?? "Free"
-  
+
   if tier == "Free" (
     sendReply(c, msg, "Only subscribers can use this feature. Subscribe at https://ko-fi.com/mistium or use /subscribe to get Lite.")
     return
   )
-  
+
   object reply_msg = sendReply(c, msg, "waiting for ai...")
-  
+
   string personality_name = getUserPersonality(msg.user.toStr())
   string personality = getPersonalityPrompt(personality_name)
-  
+
   array messages = buildAIMessages(user_data.user.assert(object), msg.content.toStr(), personality, msg.channel.toStr())
 
-  object response = queryAI(messages, tier)
-  
+  object response = queryAIWithTools(c, reply_msg, messages, tier, 0)
+
   if response.error != null (
     editMessage(c, reply_msg, "Sorry, I encountered an error: " ++ response.error.toStr())
     return
   )
-  
+
   processResponse(c, reply_msg, response, tier)
 )
 
 def validateUser(string discord_id) object (
   object user = getUserProfile(discord_id)
-  
+
   if user.error != null (
     return { error: user.error.toStr() }
   )
-  
+
   object full_user = getUserData(user.username ?? discord_id)
-  
+
   if full_user.error != null (
     return { error: full_user.error.toStr() }
   )
-  
+
   object subscription = (full_user["sys.subscription"] ?? {}).assert(object)
   string tier = (subscription["tier"] ?? "Free").toStr()
-  
+
   return {
     user: full_user,
     tier: tier
@@ -54,55 +54,247 @@ def validateUser(string discord_id) object (
 
 def buildAIMessages(object user, string prompt, string personality, string channel_id) array (
   array messages = []
-  
+
   messages.append({
     role: "system",
     content: personality
   })
-  
-  string user_context = "You are talking to the rotur user named: " ++ (user.username ?? "someone")
-  user_context ++= ". On discord they are " ++ (user.discord_id ?? "unknown")
-  user_context ++= " with display name: " ++ (user.display_name ?? user.username ?? "unknown")
-  user_context ++= ". You are chatting in " ++ channel_id ++ "."
-  
-  messages.append({
-    role: "system",
-    content: user_context
-  })
 
-  string history = getMessageHistory(channel_id)
-  if history.len > 0 (
+    string user_context = "You are talking to the rotur user named: " ++ (user.username ?? "someone")
+    user_context ++= ". On discord they are " ++ (user.discord_id ?? "unknown")
+    user_context ++= " with display name: " ++ (user.display_name ?? user.username ?? "unknown")
+    user_context ++= ". You are chatting in " ++ channel_id ++ "."
+
     messages.append({
-      role: "system",
-      content: "RECENT CHANNEL CONTEXT (last 40 messages):\n\n" ++ history
+        role: "system",
+        content: user_context
     })
-  )
-  
-  messages.append({
-    role: "user",
-    content: prompt
-  })
-  
-  return messages
+
+    string history = getMessageHistory(channel_id)
+    if history.len > 0 (
+        messages.append({
+            role: "system",
+            content: "RECENT CHANNEL CONTEXT (last 40 messages):\n\n" ++ history
+        })
+    )
+
+    messages.append({
+        role: "user",
+        content: prompt
+    })
+
+    return messages
+)
+
+def queryAIWithTools(*Connection c, object reply_msg, array messages, string tier, number depth) object (
+    if depth > 10 (
+        return { error: "Too many tool calls" }
+    )
+
+    array ai_tools = openArrayFile("./ai/tools.json")
+    object response = queryAI(messages, tier, true, ai_tools)
+
+    object choice = response.choices[1].assert(object)
+    object message = (choice.message ?? {}).assert(object)
+
+	log message
+
+    if message.tool_calls != null and message.tool_calls.len > 0 (
+        array tool_calls = message.tool_calls.assert(array)
+        string content = message.content ?? ""
+
+        object assistant_msg = {
+            role: "assistant",
+            content: content,
+            tool_calls: tool_calls
+        }
+        messages.append(assistant_msg)
+
+        for i tool_calls.len (
+            object tc = tool_calls[i].assert(object)
+            string tc_id = tc.id ?? ""
+            object func_data = (tc.function ?? {}).assert(object)
+            string func_name = func_data.name ?? ""
+            string args_raw = func_data.arguments ?? "{}"
+
+            any args_parsed = args_raw.JsonParse()
+            object args = {}
+            if typeof(args_parsed) == "object" (
+                args = args_parsed.assert(object)
+            )
+
+            string tool_display = formatToolDisplay(func_name, args)
+
+            editMessage(c, reply_msg, tool_display)
+
+            string tool_result = callTool(func_name, args)
+
+            object tool_msg = {
+                role: "tool",
+                tool_call_id: tc_id,
+                content: tool_result
+            }
+            messages.append(tool_msg)
+        )
+
+        return queryAIWithTools(c, reply_msg, messages, tier, depth + 1)
+    )
+
+    return response
+)
+
+def formatToolDisplay(string func_name, object args) string (
+    string display = func_name
+
+    if func_name == "search_web" and args.contains("query") (
+        display = "researching web: \"" ++ args.query.toStr() ++ "\""
+    ) else if func_name == "describe_image" and args.contains("image_url") (
+        display = "describing image..."
+    ) else if func_name == "get_user" and args.contains("username") (
+        display = "getting user: " ++ args.username.toStr()
+    ) else if func_name == "extract_page" and args.contains("urls") (
+        array urls = args.urls.assert(array)
+        string url_preview = urls[1].toStr() ?? ""
+        display = "reading page: " ++ url_preview
+    ) else if func_name == "get_current_time" (
+        display = "getting current time..."
+    ) else if func_name == "get_timezone_info" and args.contains("timezone") (
+        display = "checking timezone: " ++ args.timezone.toStr()
+    )
+
+    return "Calling " ++ display
+)
+
+def callTool(string name, object args) string (
+    switch name (
+		case "describe_image"
+			string image_url = (args.image_url ?? "").toStr()
+			object result = describeImage(image_url)
+			return result.toStr()
+
+		case "get_user"
+			string username = (args.username ?? "").toStr()
+			object user = getUserProfile(username)
+			return user.toStr()
+
+		case "get_current_time"
+			number ts = timestamp
+			object result = {
+				utc: {
+					iso: "placeholder",
+					unix: ts
+				}
+			}
+			return result.toStr()
+
+		case "get_timezone_info"
+			string tz = (args.timezone ?? "UTC").toStr()
+			object resp = requests.Get("https://apps.mistium.com/timezone-info?timezone=" ++ tz)
+			if resp.success == true and resp.status == 200 (
+				return resp.body.toStr()
+			)
+			return { error: "Failed to get timezone info" }.toStr()
+
+		case "search_web"
+			string query = (args.query ?? "").toStr()
+			string tavily_key = (config["tavily-api"] ?? "").toStr()
+			if tavily_key.len == 0 (
+				return { error: "Tavily API key not configured" }.toStr()
+			)
+			object resp = requests.Post("https://api.tavily.com/search", {
+				"Authorization": "Bearer " ++ tavily_key,
+				"Content-Type": "application/json",
+				"body": { query: query }
+			})
+			if resp.success (
+				return resp.body.toStr()
+			)
+			return { error: "Search failed" }.toStr()
+
+		case "search_lore"
+			string query = (args.query ?? "").toStr()
+			string tavily_key = (config["tavily-api"] ?? "").toStr()
+			if tavily_key.len == 0 (
+				return { error: "Tavily API key not configured" }.toStr()
+			)
+			object resp = requests.Post("https://api.tavily.com/search", {
+				"Authorization": "Bearer " ++ tavily_key,
+				"Content-Type": "application/json",
+				"body": { query: "originos.fandom.com " ++ query }
+			})
+
+			if resp.success (
+				any rawresults = resp.body.toStr().JsonParse().results
+				if typeof(rawresults) != "array" (
+					return { error: "Invalid response format" }.toStr()
+				)
+				array results = rawresults.assert(array)
+				array out = []
+				for i results.len (
+					object result = results[i].assert(object)
+					string url = result.url.toStr()
+					if url.startsWith("https://originos.fandom.com") (
+						out.append(url)
+					)
+				)
+				return out.toStr()
+			)
+			return { error: "Search failed" }.toStr()
+
+		case "extract_page"
+			array urls = (args.urls ?? []).assert(array)
+			string tavily_key = (config["tavily-api"] ?? "").toStr()
+			if tavily_key.len == 0 (
+				return { error: "Tavily API key not configured" }.toStr()
+			)
+			object resp = requests.Post("https://api.tavily.com/extract", {
+				"Authorization": "Bearer " ++ tavily_key,
+				"Content-Type": "application/json",
+				"body": { urls: urls }
+			})
+			if resp.success (
+				return resp.body.toStr()
+			)
+			return { error: "Extract failed" }.toStr()
+		
+		case "make_web_request"
+			string method = (args.method ?? "").toStr()
+			string url = (args.url ?? "").toStr()
+			object headers = (args.headers ?? {}).assert(object)
+			string body = (args.body ?? "").toStr()
+			string params = (args.params ?? "").toStr()
+			
+			object resp = requests.Request(method, url, {
+				"headers": headers,
+				"body": body,
+				"params": params
+			})
+
+			log resp
+
+			return resp.toStr()
+    )
+
+    return { error: "Unknown tool: " ++ name }.toStr()
 )
 
 def processResponse(*Connection c, object reply_msg, object response, string tier) (
-  string content = response.choices[1].message.content ?? ""
-  
-  if content.len == 0 (
-    editMessage(c, reply_msg, "Sorry, I couldn't generate a response to that.")
-    return
-  )
-  
-  content = sanitizeContent(content)
-  
-  if tier == "Lite" (
-    content = "(Lite - gpt-oss-120b)\n" ++ content
-  )
-  
-  if content.len > 2000 (
-    content = content.trim(0, 1997) ++ "..."
-  )
-  
-  editMessage(c, reply_msg, content)
+    string content = response.choices[1].message.content ?? ""
+
+    if content.len == 0 (
+        editMessage(c, reply_msg, "Sorry, I couldn't generate a response to that.")
+        return
+    )
+
+    content = sanitizeContent(content)
+
+    if tier == "Lite" (
+        content = "(Lite - gpt-oss-120b)\n" ++ content
+    )
+
+    if content.len > 2000 (
+        content = content.trim(0, 1997) ++ "..."
+    )
+
+    editMessage(c, reply_msg, content)
 )

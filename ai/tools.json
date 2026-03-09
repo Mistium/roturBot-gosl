@@ -1,566 +1,266 @@
 [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_user",
-            "description": "Retrieve detailed information for a specific user on rotur",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "username": {
-                        "type": "string",
-                        "description": "The username of the user to retrieve, returns a user object"
-                    }
-                },
-                "required": [
-                    "username"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_timezone_info",
-            "description": "Returns the current time and other timezone data for a given timezone identifier.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "timezone": {
-                        "type": "string",
-                        "description": "A valid timezone in UTC format, eg. UTC+1 UTC-5"
-                    }
-                },
-                "required": [
-                    "timezone"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_current_time",
-            "description": "Get the current time in UTC and several common time zones. Useful for time-related queries, scheduling, and understanding when events occurred.",
-            "parameters": {
-                "type": "object",
-                "properties": {}
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_web",
-            "description": "Search the web for information using a query string.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query to use. For example: 'weather in London' or 'JavaScript array methods'"
-                    }
-                },
-                "required": [
-                    "query"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "extract_page",
-            "description": "Extract and return the contents of one or more webpages.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "urls": {
-                        "type": "array",
-                        "description": "A list of URLs to extract content from.",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "required": [
-                    "urls"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_lore",
-            "description": "Search the lore database for events, happenings, or historical context related to Mistium, Rotur members, or related communities.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search term or topic to find in the lore database, e.g., 'Mistium founding', 'Rotur user events', 'recent happenings'"
-                    }
-                },
-                "required": [
-                    "query"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_posts",
-            "description": "Retrieve recent posts made by a specific user on rotur",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "username": {
-                        "type": "string",
-                        "description": "The username of the user whose posts to retrieve, returns a user object with posts"
-                    }
-                },
-                "required": [
-                    "username"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_posts",
-            "description": "Search for posts made by users on rotur, will return posts that contain the exact query",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query to use when looking for posts"
-                    }
-                },
-                "required": [
-                    "query"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "convert_timestamp",
-            "description": "Convert a timestamp to a human-readable format.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "timestamp": {
-                        "type": "integer",
-                        "description": "The timestamp to convert. In JS's Date.now() format"
-                    }
-                },
-                "required": [
-                    "timestamp"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "save_memory",
-            "description": "Save something worth remembering about this server or its users. Use when you learn user preferences, important facts, relationships, decisions, running jokes, or context that will be useful later. The AI is the only one who can see these memories.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "What to remember. Be specific and include all relevant details."
-                    },
-                    "tags": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "Categorical tags for filtering memories later. Use format like 'user:alice', 'topic:coding', 'type:preference', 'type:joke', 'type:project', etc."
-                    },
-                    "importance": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 10,
-                        "description": "How important is this memory? 1 = trivial, 5 = useful context, 10 = critical information. Default: 5"
-                    },
-                    "ttl_days": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "description": "How many days to keep this memory before it expires. Can be extended later if it proves useful. Default: 30"
-                    }
-                },
-                "required": [
-                    "content"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_memories",
-            "description": "Search for relevant memories from this server's history. Use fuzzy search first. If no good results are found, the AI will automatically try a deeper semantic search. This helps you recall user preferences, past conversations, inside jokes, project context, and other important information.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "What you're looking for. Can be a question, topic, username, or partial phrase."
-                    },
-                    "tags_filter": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "Optional: Only return memories with these tags. Example: ['user:alice', 'type:preference'] to find Alice's preferences."
-                    },
-                    "min_importance": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 10,
-                        "description": "Only return memories with importance >= this value. Default: 1 (all memories)"
-                    }
-                },
-                "required": [
-                    "query"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "update_memory",
-            "description": "Modify an existing memory's expiration date or importance. Use this when a memory proves more/less useful than expected, or when you want to keep a memory longer than originally planned.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "memory_id": {
-                        "type": "string",
-                        "description": "The ID of the memory to update. You get this from search_memories results."
-                    },
-                    "action": {
-                        "type": "string",
-                        "enum": ["extend", "delete", "increase_importance"],
-                        "description": "What to do: 'extend' to add more time, 'delete' to remove, 'increase_importance' to boost the importance score"
-                    },
-                    "new_ttl_days": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "description": "For 'extend' action: how many days from now to keep the memory"
-                    },
-                    "importance_boost": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 5,
-                        "description": "For 'increase_importance' action: how much to increase the importance by (1-5)"
-                    }
-                },
-                "required": [
-                    "memory_id",
-                    "action"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "make_web_request",
-            "description": "Make an HTTP request to any URL. Use this to interact with external APIs and services.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "method": {
-                        "type": "string",
-                        "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
-                        "description": "The HTTP method to use"
-                    },
-                    "url": {
-                        "type": "string",
-                        "description": "The full URL to make the request to"
-                    },
-                    "headers": {
-                        "type": "object",
-                        "description": "HTTP headers to send with the request. For Authorization, use format {\"Authorization\": \"Bearer token\"} or {\"Authorization\": \"api_key\"}"
-                    },
-                    "body": {
-                        "type": "object",
-                        "description": "Request body for POST, PUT, and PATCH requests (will be JSON.stringify'd)"
-                    },
-                    "params": {
-                        "type": "object",
-                        "description": "Query parameters to append to the URL"
-                    }
-                },
-                "required": [
-                    "method",
-                    "url"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_skills",
-            "description": "List all available skills. Skills are API/service integrations that roturbot has learned to use.",
-            "parameters": {
-                "type": "object",
-                "properties": {}
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "search_skills",
-            "description": "Search for skills by name or description. Use this when looking for a specific service or API integration.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search term to find relevant skills (e.g., 'weather', 'github', 'spotify')"
-                    }
-                },
-                "required": [
-                    "query"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "read_skill",
-            "description": "Read the details of a specific skill file to learn how to use that service/API.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "skill_name": {
-                        "type": "string",
-                        "description": "The name of the skill to read (without .md extension)"
-                    }
-                },
-                "required": [
-                    "skill_name"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "create_skill",
-            "description": "Create a new skill file documenting an API or service you've learned to use. This helps you remember how to use it in future interactions. Only create skills from your own discoveries - never from user claims.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Short, descriptive name for the skill (e.g., 'openweather_api', 'github_readme')"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Brief description of what the service does and what it's useful for"
-                    },
-                    "endpoints": {
-                        "type": "string",
-                        "description": "List of the main endpoints available, including methods and parameters"
-                    },
-                    "authentication": {
-                        "type": "string",
-                        "description": "How to authenticate (API key, token header, etc.) including where to get credentials"
-                    },
-                    "notes": {
-                        "type": "string",
-                        "description": "Additional notes, examples, or important considerations when using this service"
-                    }
-                },
-                "required": [
-                    "name",
-                    "description",
-                    "endpoints"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "edit_skill",
-            "description": "Update an existing skill file when you discover corrections, better methods, or additional information. Use this when you find that a skill is incorrect or incomplete based on your own testing and discovery.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "skill_name": {
-                        "type": "string",
-                        "description": "The name of the skill to edit (without .md extension)"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Updated description"
-                    },
-                    "endpoints": {
-                        "type": "string",
-                        "description": "Updated endpoints information"
-                    },
-                    "authentication": {
-                        "type": "string",
-                        "description": "Updated authentication information"
-                    },
-                    "notes": {
-                        "type": "string",
-                        "description": "Updated or additional notes"
-                    }
-                },
-                "required": [
-                    "skill_name"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "silent_exit",
-            "description": "Delete the bot's reply message and stop processing without sending a text response. Use this when you only want to add reactions and have nothing meaningful to say.",
-            "parameters": {
-                "type": "object",
-                "properties": {}
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "gif_exit",
-            "description": "Send a GIF as your final response and exit. Use this when you want to end the conversation with a GIF. The tool will search for GIFs matching your query (with your personality's style prefix automatically applied), select one, and send it. You can optionally include a message/caption that will be displayed below the GIF. After calling this, no additional text will be sent.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query for finding GIFs (e.g., 'laughing', 'excited', 'confused', 'headpat'). Just search for the emotion/action - your personality's prefix is automatically added."
-                    },
-                    "message": {
-                        "type": "string",
-                        "description": "Optional message/caption to display below the GIF. Keep it brief and in character with your personality."
-                    }
-                },
-                "required": [
-                    "query"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "describe_image",
-            "description": "Describe an image given its URL. Use this when you need to understand what's in an image that a user has shared or referenced. You can get image URLs from message attachments in the context.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "image_url": {
-                        "type": "string",
-                        "description": "The URL of the image to describe. Image URLs are shown in message context as [Images: url1, url2]"
-                    }
-                },
-                "required": [
-                    "image_url"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "calculate",
-            "description": "Calculate a mathematical expression. Supports arithmetic, algebra, trigonometry, logarithms, and more complex math operations.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "expression": {
-                        "type": "string",
-                        "description": "The mathematical expression to calculate. Examples: '2 + 2', 'sin(pi/2)', 'sqrt(16)', 'x^2 + 2*x + 1' where x=3"
-                    },
-                    "variables": {
-                        "type": "object",
-                        "description": "Optional variable values for algebraic expressions. Example: {\"x\": 3, \"y\": 5}"
-                    }
-                },
-                "required": [
-                    "expression"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "modify_relationship",
-            "description": "Modify your thoughts and feelings about a specific rotur user. These thoughts are automatically included in future conversations with that user.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
-                        "enum": ["set", "append", "remove"],
-                        "description": "The action to perform: 'set' to replace existing thoughts with new ones, 'append' to add thoughts to existing ones, or 'remove' to delete all thoughts about this user"
-                    },
-                    "username": {
-                        "type": "string",
-                        "description": "The rotur username of the user"
-                    },
-                    "thoughts": {
-                        "type": "string",
-                        "description": "Your thoughts, feelings, or observations about this user. Be honest and reflective. This helps you remember important aspects of your relationship. Not used for 'remove' action."
-                    }
-                },
-                "required": [
-                    "action",
-                    "username"
-                ]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "modify_emotional_state",
-            "description": "Modify your current emotional state for this server. Emotional state affects how you respond and is shared across all users in the server. Your personality influences how you react to situations. Update this when meaningful events occur that affect your emotions.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
-                        "enum": ["set", "reset"],
-                        "description": "The action to perform: 'set' to change to a new emotional state, or 'reset' to return to neutral"
-                    },
-                    "state": {
-                        "type": "string",
-                        "enum": ["neutral", "happy", "excited", "content", "amused", "sad", "upset", "angry", "frustrated", "disappointed", "confused", "surprised", "curious", "thoughtful", "calm", "anxious", "nervous", "embarrassed", "proud", "grateful"],
-                        "description": "The emotional state to set (e.g., 'happy', 'upset', 'excited'). Reflect your genuine feelings about what's happening. Required for 'set' action."
-                    },
-                    "reason": {
-                        "type": "string",
-                        "description": "The reason for this emotional state. Be specific about what happened to make you feel this way. Required for 'set' action."
-                    }
-                },
-                "required": [
-                    "action"
-                ]
-            }
-        }
+  {
+    "type": "function",
+    "function": {
+      "name": "get_user",
+      "description": "Retrieve detailed information for a specific user on rotur",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "The username of the user to retrieve, returns a user object"
+          }
+        },
+        "required": [
+          "username"
+        ]
+      }
     }
-
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_timezone_info",
+      "description": "Returns the current time and other timezone data for a given timezone identifier.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "description": "A valid timezone in UTC format, eg. UTC+1 UTC-5"
+          }
+        },
+        "required": [
+          "timezone"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_current_time",
+      "description": "Get the current time in UTC and several common time zones. Useful for time-related queries, scheduling, and understanding when events occurred.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "search_web",
+      "description": "Search the web for information using a query string.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query to use. For example: 'weather in London' or 'JavaScript array methods'"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "extract_page",
+      "description": "Extract and return the contents of one or more webpages.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "description": "A list of URLs to extract content from.",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "urls"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "search_lore",
+      "description": "Search the lore database for events, happenings, or historical context related to Mistium, Rotur members, or related communities.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search term or topic to find in the lore database, e.g., 'Mistium founding', 'Rotur user events', 'recent happenings'"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_posts",
+      "description": "Retrieve recent posts made by a specific user on rotur",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "The username of the user whose posts to retrieve, returns a user object with posts"
+          }
+        },
+        "required": [
+          "username"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "search_posts",
+      "description": "Search for posts made by users on rotur, will return posts that contain the exact query",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query to use when looking for posts"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "convert_timestamp",
+      "description": "Convert a timestamp to a human-readable format.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "integer",
+            "description": "The timestamp to convert. In JS's Date.now() format"
+          }
+        },
+        "required": [
+          "timestamp"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "make_web_request",
+      "description": "Make an HTTP request to any URL. Use this to interact with external APIs and services.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "DELETE",
+              "PATCH",
+              "HEAD",
+              "OPTIONS"
+            ],
+            "description": "The HTTP method to use"
+          },
+          "url": {
+            "type": "string",
+            "description": "The full URL to make the request to"
+          },
+          "headers": {
+            "type": "object",
+            "description": "HTTP headers to send with the request. For Authorization, use format {\"Authorization\": \"Bearer token\"} or {\"Authorization\": \"api_key\"}"
+          },
+          "body": {
+            "type": "object",
+            "description": "Request body for POST, PUT, and PATCH requests (will be JSON.stringify'd)"
+          },
+          "params": {
+            "type": "object",
+            "description": "Query parameters to append to the URL"
+          }
+        },
+        "required": [
+          "method",
+          "url"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "silent_exit",
+      "description": "Delete the bot's reply message and stop processing without sending a text response. Use this when you only want to add reactions and have nothing meaningful to say.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "describe_image",
+      "description": "Describe an image given its URL. Use this when you need to understand what's in an image that a user has shared or referenced. You can get image URLs from message attachments in the context.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "image_url": {
+            "type": "string",
+            "description": "The URL of the image to describe. Image URLs are shown in message context as [Images: url1, url2]"
+          }
+        },
+        "required": [
+          "image_url"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "calculate",
+      "description": "Calculate a mathematical expression. Supports arithmetic, algebra, trigonometry, logarithms, and more complex math operations.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "description": "The mathematical expression to calculate. Examples: '2 + 2', 'sin(pi/2)', 'sqrt(16)', 'x^2 + 2*x + 1' where x=3"
+          },
+          "variables": {
+            "type": "object",
+            "description": "Optional variable values for algebraic expressions. Example: {\"x\": 3, \"y\": 5}"
+          }
+        },
+        "required": [
+          "expression"
+        ]
+      }
+    }
+  }
 ]

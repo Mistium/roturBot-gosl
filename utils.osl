@@ -1,34 +1,43 @@
 def openObjectFile(string path) object (
-    string data = fs.ReadFile(path)
-    any parsed = data.JsonParse()
-    if typeof(parsed) != "object" (
-        return {}
-    )
-    return parsed.assert(object)
+  string data = fs.ReadFile(path)
+  any parsed = data.JsonParse()
+  if typeof(parsed) != "object" (
+    return {}
+  )
+  return parsed.assert(object)
+)
+
+def openArrayFile(string path) array (
+  string data = fs.ReadFile(path)
+  any parsed = data.JsonParse()
+  if typeof(parsed) != "array" (
+    return []
+  )
+  return parsed.assert(array)
 )
 
 def rawToMsg(object raw) object (
-    any rawmsg = raw.message
-    object msg = {}
-    if typeof(rawmsg) == "object" (
-        msg = rawmsg.assert(object)
-    )
-    return {
-        user: raw.user ?? msg.user,
-        content: raw.content ?? msg.content,
-        channel: raw.channel,
-        id: raw.id ?? msg.id
-    }
+  any rawmsg = raw.message
+  object msg = {}
+  if typeof(rawmsg) == "object" (
+    msg = rawmsg.assert(object)
+  )
+  return {
+    user: raw.user ?? msg.user,
+    content: raw.content ?? msg.content,
+    channel: raw.channel,
+    id: raw.id ?? msg.id
+  }
 )
 
 def randomString(number) string (
-    string out = ""
-    for i number (
-        out += randomChar()
-    )
-    return out
+  string out = ""
+  for i number (
+    out += randomChar()
+  )
+  return out
 )
 
 def randomChar() string (
-    return "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[random(0, 62)].toStr()
+  return "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[random(0, 62)].toStr()
 )

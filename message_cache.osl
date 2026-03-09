@@ -1,47 +1,47 @@
 def addMessageToCache(string channel_id, object msg) (
   if !channel_messages.contains(channel_id) (
-    channel_messages[channel_id] = []
+  channel_messages[channel_id] = []
   )
   
   array messages = channel_messages[channel_id].assert(array)
   
   object msg_data = {
-    id: msg.id ?? "",
-    author: msg.user ?? "unknown",
-    content: msg.content ?? "",
-    timestamp: timestamp
+  id: msg.id ?? "",
+  author: msg.user ?? "unknown",
+  content: msg.content ?? "",
+  timestamp: timestamp
   }
   
   messages.append(msg_data)
   
   if messages.len > 40 (
-    array new_messages = []
-    auto i = messages.len - 40
-    loop 40 (
-      i ++
-      new_messages.append(messages[i])
-    )
-    channel_messages[channel_id] = new_messages
+  array new_messages = []
+  auto i = messages.len - 40
+  loop 40 (
+    i ++
+    new_messages.append(messages[i])
+  )
+  channel_messages[channel_id] = new_messages
   )
 )
 
 def getMessageHistory(string channel_id) string (
   if !channel_messages.contains(channel_id) (
-    return ""
+  return ""
   )
   
   array messages = channel_messages[channel_id].assert(array)
   
   if messages.len == 0 (
-    return ""
+  return ""
   )
   
   array history_lines = []
   
   for i messages.len (
-    object msg = messages[i].assert(object)
-    string line = "[" ++ msg.timestamp.toStr() ++ "] " ++ msg.author.toStr() ++ ": " ++ msg.content.toStr()
-    history_lines.append(line)
+  object msg = messages[i].assert(object)
+  string line = "[" ++ msg.timestamp.toStr() ++ "] " ++ msg.author.toStr() ++ ": " ++ msg.content.toStr()
+  history_lines.append(line)
   )
   
   return history_lines.join("\n")
@@ -49,6 +49,6 @@ def getMessageHistory(string channel_id) string (
 
 def clearChannelCache(string channel_id) (
   if channel_messages.contains(channel_id) (
-    channel_messages.delete(channel_id)
+  channel_messages.delete(channel_id)
   )
 )

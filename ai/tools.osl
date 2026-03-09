@@ -1,0 +1,54 @@
+def describeImage(string image_url) object (
+  if image_url.len == 0 (
+    return { error: "Missing required parameter: image_url" }
+  )
+
+  object img_resp = requests.Get(image_url)
+
+  if !img_resp.success or img_resp.status != 200 (
+    return { error: "Failed to download image" }
+  )
+
+  string content_type = "image/png"
+  if img_resp.headers.contains("Content-Type") (
+    content_type = img_resp.headers["Content-Type"].toStr()
+  )
+
+  string img_bytes = img_resp.body.toStr()
+  string base64_image = btoa(img_bytes)
+  string data_url = "data:" ++ content_type ++ ";base64," ++ base64_image
+
+  object payload = {
+    image: data_url,
+    isUrl: false,
+    systemPrompt: "Describe the image in detail.",
+    userPrompt: "Describe this image.",
+    stream: false
+  }
+
+  object api_resp = requests.Post("https://describeimage.ai/api/describe-image-ge", {
+    "User-Agent": "Mozilla/5.0",
+    "Content-Type": "application/json",
+    "Origin": "https://describeimage.ai",
+    "body": payload
+  })
+
+  if !api_resp.success (
+    return { error: "Image API request failed" }
+  )
+
+  if api_resp.status != 200 (
+    return { error: "Image API returned status " ++ api_resp.status.toStr() }
+  )
+
+  any parsed_raw = api_resp.body.toStr().JsonParse()
+
+  if typeof(parsed_raw) != "object" (
+    return { error: "Invalid response format" }
+  )
+
+  object parsed = parsed_raw.assert(object)
+  string description = (parsed.result ?? "No description.").toStr().strip()
+
+  return { success: true, description: description }
+)

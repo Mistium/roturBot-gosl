@@ -1,10 +1,10 @@
 def balance(*Connection c, object msg) (
-    object user = getUserProfile(msg.user)
+  object user = getUserProfile(msg.user)
 
-    if user.error != null (
-        sendResponse(c, msg, user.error.toStr())
-        return
-    )
+  if user.error != null (
+    sendResponse(c, msg, user.error.toStr())
+    return
+  )
 
-    sendResponse(c, msg, "Balance: " ++ user.currency)
+  sendResponse(c, msg, "Balance: " ++ user.currency)
 )

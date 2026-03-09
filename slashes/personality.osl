@@ -2,39 +2,39 @@ def personality(*Connection c, object msg) (
   array parts = msg.content.toStr().split(" ")
   
   if parts.len < 2 (
-    array personality_list = listPersonalities()
-    sendResponse(c, msg, "Available personalities:\n" ++ personality_list.join("\n"))
-    return
+  array personality_list = listPersonalities()
+  sendResponse(c, msg, "Available personalities:\n" ++ personality_list.join("\n"))
+  return
   )
   
   string action = parts[1].toStr()
   
   if action == "set" (
-    if parts.len < 2 (
-      sendResponse(c, msg, "Usage: /personality set <name>")
-      return
-    )
-    string name = parts[2].toStr()
-    string personality_content = getPersonalityPrompt(name)
-    if personality_content.len > 0 (
-      user_personalities[msg.user.toStr()] = name
-      sendResponse(c, msg, "Personality set to: " ++ name)
-    ) else (
-      sendResponse(c, msg, "Personality not found: " ++ name)
-    )
+  if parts.len < 2 (
+    sendResponse(c, msg, "Usage: /personality set <name>")
     return
+  )
+  string name = parts[2].toStr()
+  string personality_content = getPersonalityPrompt(name)
+  if personality_content.len > 0 (
+    user_personalities[msg.user.toStr()] = name
+    sendResponse(c, msg, "Personality set to: " ++ name)
+  ) else (
+    sendResponse(c, msg, "Personality not found: " ++ name)
+  )
+  return
   )
   
   if action == "get" (
-    string current = getUserPersonality(msg.user.toStr())
-    sendResponse(c, msg, "Your current personality: " ++ current)
-    return
+  string current = getUserPersonality(msg.user.toStr())
+  sendResponse(c, msg, "Your current personality: " ++ current)
+  return
   )
   
   if action == "list" (
-    array personality_list = listPersonalities()
-    sendResponse(c, msg, "Available personalities:\n" ++ personality_list.join("\n"))
-    return
+  array personality_list = listPersonalities()
+  sendResponse(c, msg, "Available personalities:\n" ++ personality_list.join("\n"))
+  return
   )
   
   sendResponse(c, msg, "Usage: /personality [set|get|list]")
@@ -46,15 +46,15 @@ def getUserPersonality(string user_id) string (
 
 def listPersonalities() array (
   return [
-    "roturbot",
-    "butler",
-    "detective",
-    "goth",
-    "madscientist",
-    "maid",
-    "ragebaiter",
-    "riley",
-    "roommate",
-    "tsundere"
+  "roturbot",
+  "butler",
+  "detective",
+  "goth",
+  "madscientist",
+  "maid",
+  "ragebaiter",
+  "riley",
+  "roommate",
+  "tsundere"
   ]
 )

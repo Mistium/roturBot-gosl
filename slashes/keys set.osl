@@ -1,35 +1,35 @@
 def keys_set(*Connection c, object msg) (
-    string content = msg.content
+  string content = msg.content
 
-    array parts = content.split(" ")
+  array parts = content.split(" ")
 
-    if parts.len < 2 (
-        sendResponse(c, msg, "Usage: /keys set <keyname> <value>")
-        return
-    )
+  if parts.len < 2 (
+    sendResponse(c, msg, "Usage: /keys set <keyname> <value>")
+    return
+  )
 
-    string keyname = parts[1]
-    string value = parts.trim(2, -1).join(" ")
+  string keyname = parts[1]
+  string value = parts.trim(2, -1).join(" ")
 
-    object data = getUserData(msg.user)
+  object data = getUserData(msg.user)
 
-    if data.error != null (
-        sendResponse(c, msg, data.error.toStr())
-        return
-    )
+  if data.error != null (
+    sendResponse(c, msg, data.error.toStr())
+    return
+  )
 
-    if !data.contains("keys") (
-        data.keys = {}
-    )
+  if !data.contains("keys") (
+    data.keys = {}
+  )
 
-    data.keys[keyname] = value
+  data.keys[keyname] = value
 
-    object resp = users_patch(data.key, keyname, value)
+  object resp = users_patch(data.key, keyname, value)
 
-    if resp.error != null (
-        sendResponse(c, msg, resp.error.toStr())
-        return
-    )
+  if resp.error != null (
+    sendResponse(c, msg, resp.error.toStr())
+    return
+  )
 
-    sendResponse(c, msg, "Key " ++ keyname ++ " set to " ++ value)
+  sendResponse(c, msg, "Key " ++ keyname ++ " set to " ++ value)
 )
