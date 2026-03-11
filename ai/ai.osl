@@ -158,7 +158,7 @@ def queryAIWithTools(*Connection c, object reply_msg, array messages, string tie
   object choice = response.choices[1].assert(object)
   object message = (choice.message ?? {}).assert(object)
 
-  log message
+  // log message
 
   if message.tool_calls != null and message.tool_calls.len > 0 (
     array tool_calls = message.tool_calls.assert(array)
@@ -374,7 +374,7 @@ def callTool(string name, object args, string channel_id) string (
         "params": params
       })
 
-      log resp
+      // log resp
 
       return resp.toStr()
 

@@ -11,7 +11,7 @@ def messageHandler(*Connection c, string message) (
       recent_message_listeners.shift()
     )
   )
-  log json.cmd
+  // log json.cmd
   switch json.cmd (
     case "handshake"
       object val = json.val
@@ -72,8 +72,8 @@ def messageHandler(*Connection c, string message) (
 
     case "error"
     default
-      log "Unknown command: " ++ (json.cmd ?? "unknown")
-      log json
+      // log "Unknown command: " ++ (json.cmd ?? "unknown")
+      // log json
   )
 )
 
