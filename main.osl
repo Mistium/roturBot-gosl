@@ -133,5 +133,4 @@ mainloop:
 
   while true (
     wait 60000
-    checkDailyReset()
   )
