@@ -1,16 +1,41 @@
 def transfer(*Connection c, object msg) (
-  string content = msg.content
+  string username = ""
+  number amount = 0
+  string note = ""
 
-  array parts = content.split(" ")
+  // Prefer structured args from slash_call, fall back to text parsing
+  any msg_args = msg.args
+  if typeof(msg_args) == "object" (
+    object args = msg_args.assert(object)
+    if args.getKeys().len > 0 (
+      username = (args.username ?? "").toStr()
+      amount = (args.amount ?? 0).toNum()
+      note = (args.note ?? "").toStr()
+    ) else (
+      array parts = msg.content.toStr().split(" ")
+      if parts.len < 2 (
+        sendResponse(c, msg, "Usage: /transfer <username> <amount>")
+        return
+      )
+      username = parts[1].toStr()
+      amount = parts[2].toNum()
+      note = parts.trim(3, -1).join(" ")
+    )
+  ) else (
+    array parts = msg.content.toStr().split(" ")
+    if parts.len < 2 (
+      sendResponse(c, msg, "Usage: /transfer <username> <amount>")
+      return
+    )
+    username = parts[1].toStr()
+    amount = parts[2].toNum()
+    note = parts.trim(3, -1).join(" ")
+  )
 
-  if parts.len < 2 (
+  if username == "" (
     sendResponse(c, msg, "Usage: /transfer <username> <amount>")
     return
   )
-
-  string username = parts[1]
-  number amount = parts[2].toNum()
-  string note = parts.trim(3, -1).join(" ")
 
   if amount < 0.01 (
     sendResponse(c, msg, "Amount must be at least 0.01")

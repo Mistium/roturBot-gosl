@@ -9,6 +9,7 @@ object recent_listened_messages = {}
 object connections = {}
 array servers = ["wss://chats.mistium.com", "wss://dms.mistium.com"]
 object commands = {}
+object slash_schemas = {}
 object channel_messages = {}
 object user_personalities = {}
 
@@ -49,12 +50,92 @@ mainloop:
   registerCommand("!hello", hello)
   registerCommand("!roturacc", roturacc)
 
-  registerCommand("/balance", balance)
-  registerCommand("/transfer", transfer)
+  registerSlashCommand("balance", balance, {
+    name: "balance",
+    description: "Check your current credit balance",
+    options: [],
+    ephemeral: true
+  })
 
-  registerCommand("/keys get", keys_get)
-  registerCommand("/keys set", keys_set)
-  registerCommand("/personality", personality)
+  registerSlashCommand("transfer", transfer, {
+    name: "transfer",
+    description: "Transfer credits to another user",
+    options: [
+      {
+        name: "username",
+        description: "The user to transfer credits to",
+        type: "str",
+        required: true
+      },
+      {
+        name: "amount",
+        description: "Amount of credits to transfer",
+        type: "float",
+        required: true
+      },
+      {
+        name: "note",
+        description: "Optional note for the transfer",
+        type: "str",
+        required: false
+      }
+    ],
+    ephemeral: true
+  })
+
+  registerSlashCommand("keys get", keys_get, {
+    name: "keys get",
+    description: "Get a value from your user data",
+    options: [
+      {
+        name: "keyname",
+        description: "The key to retrieve",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: true
+  })
+  registerSlashCommand("keys set", keys_set, {
+    name: "keys set",
+    description: "Set a value in your user data",
+    options: [
+      {
+        name: "keyname",
+        description: "The key to set",
+        type: "str",
+        required: true
+      },
+      {
+        name: "value",
+        description: "The value to store",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: true
+  })
+
+  registerSlashCommand("personality", personality, {
+    name: "personality",
+    description: "View or change the bot personality",
+    options: [
+      {
+        name: "action",
+        description: "Action to perform: set, get, or list",
+        type: "enum",
+        choices: ["set", "get", "list"],
+        required: false
+      },
+      {
+        name: "name",
+        description: "Personality name (required when action is set)",
+        type: "str",
+        required: false
+      }
+    ],
+    ephemeral: true
+  })
 
   for i servers.len (
     auto connection = ws.Connect(servers[i].toStr())

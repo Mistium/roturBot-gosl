@@ -1,15 +1,32 @@
 def keys_set(*Connection c, object msg) (
-  string content = msg.content
+  string keyname = ""
+  string value = ""
 
-  array parts = content.split(" ")
+  any msg_args = msg.args
+  if typeof(msg_args) == "object" (
+    object args = msg_args.assert(object)
+    if args.contains("keyname") (
+      keyname = args.keyname.toStr()
+    )
+    if args.contains("value") (
+      value = args.value.toStr()
+    )
+  )
 
-  if parts.len < 2 (
+  if keyname == "" (
+    array parts = msg.content.toStr().split(" ")
+    if parts.len < 2 (
+      sendResponse(c, msg, "Usage: /keys set <keyname> <value>")
+      return
+    )
+    keyname = parts[1].toStr()
+    value = parts.trim(2, -1).join(" ")
+  )
+
+  if keyname == "" (
     sendResponse(c, msg, "Usage: /keys set <keyname> <value>")
     return
   )
-
-  string keyname = parts[1]
-  string value = parts.trim(2, -1).join(" ")
 
   object data = getUserData(msg.user)
 
