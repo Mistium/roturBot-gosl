@@ -1,3 +1,96 @@
+// Rotur API helpers
+
+def fetchUserData(username) object (
+  object resp = requests.Get("https://api.rotur.dev/admin/get_user_by?key=username&value=" ++ username.toStr(), ADMIN_HEADERS)
+  if !resp.success (
+    return { error: "Failed to fetch user data." }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Failed to fetch user data." }
+  )
+  object user = parsed.assert(object)
+  if user.error != null (
+    return { error: user.error.toStr() }
+  )
+  // update cache
+  string token = (user.key ?? "").toStr()
+  if token != "" (
+    token_cache[username.toStr()] = token
+  )
+  return user
+)
+
+def getUserData(username) object (
+  return fetchUserData(username)
+)
+
+// Returns the auth token for a user, using the cache.
+// Returns "" if the token cannot be obtained.
+def getToken(username) string (
+  string uname = username.toStr()
+
+  // return cached token if we have one
+  if token_cache.contains(uname) (
+    return token_cache[uname].toStr()
+  )
+
+  // cache miss — fetch from API
+  object user = fetchUserData(uname)
+  if user.error != null (
+    return ""
+  )
+  return (token_cache[uname] ?? "").toStr()
+)
+
+// Invalidates cached token and refetches. Returns new token or "".
+def invalidateToken(username) string (
+  string uname = username.toStr()
+  token_cache.delete(uname)
+  object user = fetchUserData(uname)
+  if user.error != null (
+    return ""
+  )
+  return (token_cache[uname] ?? "").toStr()
+)
+
+def getUserFileSize(token) number (
+  object resp = requests.Get("https://api.rotur.dev/files/usage?auth=" ++ token.toStr())
+  if !resp.success (
+    return 0
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return 0
+  )
+  object data = parsed.assert(object)
+  return (data.used_size ?? 0).toNum()
+)
+
+def getPostsByUser(username) object (
+  object resp = requests.Get("https://api.rotur.dev/profile?username=" ++ username.toStr() ++ "&include_posts=1")
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def searchPostsByQuery(query) object (
+  object resp = requests.Get("https://api.rotur.dev/search_posts?q=" ++ query.toStr() ++ "&limit=20")
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
 def getUserProfile(username) object (
   object resp = requests.Get("https://api.rotur.dev/profile?name=" ++ username.toStr())
   if !resp.success (
@@ -10,47 +103,277 @@ def getUserProfile(username) object (
   return parsed.assert(object)
 )
 
-def getUserData(username) object (
-  object resp = requests.Get("https://api.rotur.dev/admin/get_user_by?key=username&value=" ++ username.toStr(), ADMIN_HEADERS)
-
-  if !resp.success (
-    return { error: "Request failed" }
-  )
-
-  object body = resp.body.toStr().JsonParse().assert(object)
-
-  if body.error != null (
-    return { error: body.error.toStr() }
-  )
-
-  if typeof(body) != "object" (
-    return { error: "Invalid response" }
-  )
-
-  return body
-)
-
-def getUserFileSize(token) number (
-  object resp = requests.Get("https://api.rotur.dev/files/usage?auth=" ++ token)
-  if !resp.success (
-    return 0
-  )
-  return resp.body.toStr().JsonParse().size.toNum()
-)
-
 def users_patch(auth, key, value) object (
   object resp = requests.Patch("https://api.rotur.dev/users", {
     "content-type": "application/json",
+    "body": { "auth": auth, "key": key, "value": value }
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def users_delete(auth, key) object (
+  object resp = requests.Delete("https://api.rotur.dev/users", {
+    "content-type": "application/json",
+    "body": { "auth": auth, "key": key }
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  string body_str = resp.body.toStr()
+  if body_str == "" (
+    return { success: true }
+  )
+  any parsed = body_str.JsonParse()
+  if typeof(parsed) != "object" (
+    return { success: true }
+  )
+  return parsed.assert(object)
+)
+
+def refreshToken(auth) object (
+  object resp = requests.Post("https://api.rotur.dev/me/refresh_token?auth=" ++ auth.toStr(), {
+    "content-type": "application/json"
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { success: true }
+  )
+  return parsed.assert(object)
+)
+
+def getUserStanding(username) object (
+  object resp = requests.Get("https://api.rotur.dev/get_standing?username=" ++ username.toStr())
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def getStatsUsers() object (
+  object resp = requests.Get("https://api.rotur.dev/stats/users")
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def getStatsSystems() object (
+  object resp = requests.Get("https://api.rotur.dev/stats/systems")
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def getStatsFollowers() array (
+  object resp = requests.Get("https://api.rotur.dev/stats/followers")
+  if !resp.success (
+    return []
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "array" (
+    return []
+  )
+  return parsed.assert(array)
+)
+
+def followUser(auth, username) object (
+  object resp = requests.Get("https://api.rotur.dev/follow?auth=" ++ auth.toStr() ++ "&name=" ++ username.toStr())
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def unfollowUser(auth, username) object (
+  object resp = requests.Get("https://api.rotur.dev/unfollow?auth=" ++ auth.toStr() ++ "&name=" ++ username.toStr())
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def getFollowing(username) object (
+  object resp = requests.Get("https://api.rotur.dev/following?name=" ++ username.toStr())
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def blockUser(auth, username) object (
+  object resp = requests.Post("https://api.rotur.dev/me/block/" ++ username.toStr() ++ "?auth=" ++ auth.toStr(), {
+    "content-type": "application/json"
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { success: true }
+  )
+  return parsed.assert(object)
+)
+
+def unblockUser(auth, username) object (
+  object resp = requests.Post("https://api.rotur.dev/me/unblock/" ++ username.toStr() ++ "?auth=" ++ auth.toStr(), {
+    "content-type": "application/json"
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { success: true }
+  )
+  return parsed.assert(object)
+)
+
+def friendsRequest(auth, username) object (
+  object resp = requests.Post("https://api.rotur.dev/friends/request/" ++ username.toStr() ++ "?auth=" ++ auth.toStr(), {
+    "content-type": "application/json"
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def friendsRemove(auth, username) object (
+  object resp = requests.Post("https://api.rotur.dev/friends/remove/" ++ username.toStr() ++ "?auth=" ++ auth.toStr(), {
+    "content-type": "application/json"
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def friendsList(auth) object (
+  object resp = requests.Get("https://api.rotur.dev/friends?auth=" ++ auth.toStr())
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def friendsAccept(auth, username) object (
+  object resp = requests.Post("https://api.rotur.dev/friends/accept/" ++ username.toStr() ++ "?auth=" ++ auth.toStr(), {
+    "content-type": "application/json"
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def friendsReject(auth, username) object (
+  object resp = requests.Post("https://api.rotur.dev/friends/reject/" ++ username.toStr() ++ "?auth=" ++ auth.toStr(), {
+    "content-type": "application/json"
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def keysBuy(key_id, auth) object (
+  object resp = requests.Get("https://api.rotur.dev/keys/buy/" ++ key_id.toStr() ++ "?auth=" ++ auth.toStr())
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def keysCancel(key_id, auth) object (
+  object resp = requests.Delete("https://api.rotur.dev/keys/cancel/" ++ key_id.toStr() ++ "?auth=" ++ auth.toStr(), {
+    "content-type": "application/json"
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)
+
+def adminUpdateUser(update_type, username, key, value) object (
+  object resp = requests.Post("https://api.rotur.dev/admin/update_user", {
+    "content-type": "application/json",
+    "Authorization": ADMIN_TOKEN,
     "body": {
-      "auth": auth,
+      "type": update_type,
+      "username": username,
       "key": key,
       "value": value
     }
   })
-
   if !resp.success (
     return { error: "Request failed" }
   )
-
-  return resp.body.toStr().JsonParse().assert(object)
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
 )

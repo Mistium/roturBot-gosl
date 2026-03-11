@@ -51,6 +51,25 @@
   {
     "type": "function",
     "function": {
+      "name": "convert_timestamp",
+      "description": "Convert a timestamp to a human-readable format.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "integer",
+            "description": "The timestamp to convert. In JS's Date.now() format"
+          }
+        },
+        "required": [
+          "timestamp"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "search_web",
       "description": "Search the web for information using a query string.",
       "parameters": {
@@ -118,7 +137,7 @@
         "properties": {
           "username": {
             "type": "string",
-            "description": "The username of the user whose posts to retrieve, returns a user object with posts"
+            "description": "The username of the user whose posts to retrieve"
           }
         },
         "required": [
@@ -142,25 +161,6 @@
         },
         "required": [
           "query"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "convert_timestamp",
-      "description": "Convert a timestamp to a human-readable format.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "timestamp": {
-            "type": "integer",
-            "description": "The timestamp to convert. In JS's Date.now() format"
-          }
-        },
-        "required": [
-          "timestamp"
         ]
       }
     }
@@ -213,25 +213,14 @@
   {
     "type": "function",
     "function": {
-      "name": "silent_exit",
-      "description": "Delete the bot's reply message and stop processing without sending a text response. Use this when you only want to add reactions and have nothing meaningful to say.",
-      "parameters": {
-        "type": "object",
-        "properties": {}
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "describe_image",
-      "description": "Describe an image given its URL. Use this when you need to understand what's in an image that a user has shared or referenced. You can get image URLs from message attachments in the context.",
+      "description": "Describe an image given its URL. Use this when you need to understand what's in an image that a user has shared or referenced.",
       "parameters": {
         "type": "object",
         "properties": {
           "image_url": {
             "type": "string",
-            "description": "The URL of the image to describe. Image URLs are shown in message context as [Images: url1, url2]"
+            "description": "The URL of the image to describe."
           }
         },
         "required": [
@@ -244,13 +233,13 @@
     "type": "function",
     "function": {
       "name": "calculate",
-      "description": "Calculate a mathematical expression. Supports arithmetic, algebra, trigonometry, logarithms, and more complex math operations.",
+      "description": "Calculate a mathematical expression. Supports arithmetic, algebra, trigonometry, logarithms, and more.",
       "parameters": {
         "type": "object",
         "properties": {
           "expression": {
             "type": "string",
-            "description": "The mathematical expression to calculate. Examples: '2 + 2', 'sin(pi/2)', 'sqrt(16)', 'x^2 + 2*x + 1' where x=3"
+            "description": "The mathematical expression to calculate. Examples: '2 + 2', 'sin(pi/2)', 'sqrt(16)'"
           },
           "variables": {
             "type": "object",
@@ -260,6 +249,194 @@
         "required": [
           "expression"
         ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "save_memory",
+      "description": "Save user preferences, facts, jokes, or context for later recall. Memories are stored per-channel.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "What to remember"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tags like 'user:alice', 'type:preference'"
+          },
+          "importance": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "1-10, default 5"
+          },
+          "ttl_days": {
+            "type": "integer",
+            "description": "Days to keep, default 30"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "search_memories",
+      "description": "Search channel memories using fuzzy matching to recall preferences, jokes, context.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "What you're looking for"
+          },
+          "tags_filter": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by tags like ['user:alice', 'type:preference']"
+          },
+          "min_importance": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results to return, default 5"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "update_memory",
+      "description": "Modify memory expiration or importance when usage patterns change.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "description": "ID from search_memories results"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "extend",
+              "delete",
+              "increase_importance"
+            ]
+          },
+          "new_ttl_days": {
+            "type": "integer",
+            "description": "Days for 'extend' action"
+          },
+          "importance_boost": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Boost for 'increase_importance' action"
+          }
+        },
+        "required": [
+          "memory_id",
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "modify_relationship",
+      "description": "Track thoughts about users. Included in future conversations to personalise responses.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "set",
+              "append",
+              "remove"
+            ],
+            "description": "set/append/remove thoughts"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "Discord ID of the user"
+          },
+          "username": {
+            "type": "string",
+            "description": "rotur username of the user"
+          },
+          "thoughts": {
+            "type": "string",
+            "description": "Your observations about this person. Not used for 'remove'"
+          }
+        },
+        "required": [
+          "action",
+          "user_id",
+          "username"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "modify_emotional_state",
+      "description": "Set or reset your emotional state for this channel. Affects responses and persists across users.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "set",
+              "reset"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "description": "State to set: neutral, happy, excited, content, amused, sad, upset, angry, frustrated, disappointed, confused, surprised, curious, thoughtful, calm, anxious, nervous, embarrassed, proud, grateful. Required for 'set'"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why you feel this way. Required for 'set'"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "silent_exit",
+      "description": "Stop processing and send no text response. Use when you only want to react or have nothing meaningful to say.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     }
   }

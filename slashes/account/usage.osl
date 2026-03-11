@@ -1,0 +1,10 @@
+def usage(*Connection c, object msg) (
+  string token = getToken(msg.user)
+  if token == "" (
+    sendResponse(c, msg, "Could not retrieve your account token.")
+    return
+  )
+
+  number size = getUserFileSize(token)
+  sendResponse(c, msg, "Your file system usage: " ++ size.toStr() ++ " bytes")
+)

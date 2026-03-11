@@ -1,0 +1,51 @@
+def accorigins(*Connection c, object msg) (
+  object stats = getStatsSystems()
+
+  if stats.error != null (
+    sendResponse(c, msg, "Error fetching system statistics.")
+    return
+  )
+
+  array keys = stats.getKeys()
+
+  if keys.len == 0 (
+    sendResponse(c, msg, "No system statistics available.")
+    return
+  )
+
+  number total = 0
+  for i keys.len (
+    string k = keys[i].toStr()
+    total = total + stats[k].toNum()
+  )
+
+  // build sortable array
+  array rows = []
+  for i keys.len (
+    string k = keys[i].toStr()
+    number cnt = stats[k].toNum()
+    rows.append({ name: k, count: cnt })
+  )
+
+  // sort ascending by count, then iterate in reverse
+  rows = arrays.SortByNum(rows, "count")
+
+  // format output — iterate descending (high to low)
+  string output = "```\nAccount Origins (" ++ total.toStr() ++ " total users)\n\n"
+  for i rows.len (
+    object row = rows[rows.len - i + 1].assert(object)
+    string system = row.name.toStr()
+    number count = row.count.toNum()
+    number pct = 0
+    if total > 0 (
+      pct = (count / total * 100)
+    )
+    // round to 2 decimal places
+    number pct_rounded = (pct * 100).round() / 100
+    string pct_str = pct_rounded.toStr()
+    output = output ++ system ++ ": " ++ count.toStr() ++ " (" ++ pct_str ++ "%)\n"
+  )
+
+  output = output ++ "```"
+  sendResponse(c, msg, output)
+)

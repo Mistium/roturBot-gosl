@@ -1,0 +1,19 @@
+def refresh_token(*Connection c, object msg) (
+  string token = getToken(msg.user)
+  if token == "" (
+    sendResponse(c, msg, "Could not retrieve your auth token.")
+    return
+  )
+
+  object resp = refreshToken(token)
+
+  if resp.error != null (
+    sendResponse(c, msg, "Failed to refresh token: " ++ resp.error.toStr())
+    return
+  )
+
+  // token has changed — invalidate cache so next call refetches
+  token_cache.delete(msg.user.toStr())
+
+  sendResponse(c, msg, "Your rotur authentication token has been rotated successfully.")
+)

@@ -1,0 +1,70 @@
+
+def registerEconomyCommands() (
+  registerSlashCommand("balance", balance, {
+    name: "balance",
+    description: "Check your current credit balance",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("daily", daily, {
+    name: "daily",
+    description: "Claim your free daily credits (resets at midnight)",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("transfer", transfer, {
+    name: "transfer",
+    description: "Transfer credits to another user",
+    options: [
+      {
+        name: "username",
+        description: "The user to transfer credits to",
+        type: "str",
+        required: true
+      },
+      {
+        name: "amount",
+        description: "Amount of credits to transfer",
+        type: "float",
+        required: true
+      },
+      {
+        name: "note",
+        description: "Optional note for the transfer",
+        type: "str",
+        required: false
+      }
+    ],
+    ephemeral: true
+  })
+
+  registerSlashCommand("subscribe", subscribe, {
+    name: "subscribe",
+    description: "Subscribe to Lite (15 credits per month)",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("unsubscribe", unsubscribe, {
+    name: "unsubscribe",
+    description: "Unsubscribe from Lite",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("gamble", gamble, {
+    name: "gamble",
+    description: "Gamble your credits for a chance to win more",
+    options: [
+      {
+        name: "amount",
+        description: "Amount to gamble",
+        type: "float",
+        required: true
+      }
+    ],
+    ephemeral: true
+  })
+)

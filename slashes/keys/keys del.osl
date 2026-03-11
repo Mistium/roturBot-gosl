@@ -1,0 +1,31 @@
+def keys_del(*Connection c, object msg) (
+  string keyname = ""
+
+  any msg_args = msg.args
+  if typeof(msg_args) == "object" (
+    object args = msg_args.assert(object)
+    if args.contains("keyname") (
+      keyname = args.keyname.toStr()
+    )
+  )
+
+  if keyname == "" (
+    sendResponse(c, msg, "Usage: /keys del <keyname>")
+    return
+  )
+
+  string token = getToken(msg.user)
+  if token == "" (
+    sendResponse(c, msg, "Could not retrieve your auth token.")
+    return
+  )
+
+  object resp = users_delete(token, keyname)
+
+  if resp.error != null (
+    sendResponse(c, msg, resp.error.toStr())
+    return
+  )
+
+  sendResponse(c, msg, "Key '" ++ keyname ++ "' deleted successfully.")
+)

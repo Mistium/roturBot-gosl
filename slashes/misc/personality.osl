@@ -39,22 +39,3 @@ def personality(*Connection c, object msg) (
   
   sendResponse(c, msg, "Usage: /personality [set|get|list]")
 )
-
-def getUserPersonality(string user_id) string (
-  return (user_personalities[user_id] ?? "roturbot").toStr()
-)
-
-def listPersonalities() array (
-  return [
-  "roturbot",
-  "butler",
-  "detective",
-  "goth",
-  "madscientist",
-  "maid",
-  "ragebaiter",
-  "riley",
-  "roommate",
-  "tsundere"
-  ]
-)

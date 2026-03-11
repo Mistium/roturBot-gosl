@@ -33,6 +33,21 @@ def messageHandler(*Connection c, string message) (
       // log "User disconnected: " ++ (json.username ?? "unknown")
     case "message_new"
       message_new(c, json, config.token.toStr())
+      if json.message != null and typeof(json.message) == "object" (
+        object msg_obj = json.message.assert(object)
+        if msg_obj.interaction != null and typeof(msg_obj.interaction) == "object" (
+          object inter = msg_obj.interaction.assert(object)
+          string react_key = inter.command.toStr() ++ ":" ++ inter.username.toStr()
+          if pending_reactions.contains(react_key) (
+            pending_reactions.delete(react_key)
+            string msg_id = msg_obj.id.toStr()
+            string ch = json.channel.toStr()
+            if msg_id != "" (
+              reactToMessage(c, ch, msg_id, "💰")
+            )
+          )
+        )
+      )
     case "slash_call"
       handleSlashCall(c, json)
     case "slash_register"
@@ -71,19 +86,13 @@ def getListenedMessage(string listener) object (
   return rawToMsg(data)
 )
 
-def closeHandler(*Connection c) (
-  log "Connection closed"
-  wait 10
-  log "Reconnecting to " ++ (c.data.serverUrl ?? "unknown")
-  "*Connection" connection = ws.Connect(c.data.serverUrl.toStr())
-  if connection == null (
-    log "Failed to reconnect"
-    return
-  )
-  connection.OnMessage(messageHandler)
-  connection.OnClose(closeHandler)
-  connection.data.serverUrl = c.data.serverUrl
-  connections[c.data.serverUrl] = connection
+def reactToMessage(*Connection c, string channel, string message_id, string emoji) (
+  c.Send({
+    cmd: "message_react_add",
+    channel: channel,
+    id: message_id,
+    emoji: emoji
+  })
 )
 
 def registerCommand(string name, any handler) (
@@ -151,21 +160,17 @@ def handleSlashCall(*Connection c, object json) (
 )
 
 def sendResponse(*Connection c, object msg, string content) object (
-  // If this came from a slash_call, use slash_response instead of message_new
   if msg.command != null (
-    string listener = randomString(20)
+    string react_key = msg.command.toStr() ++ ":" ++ msg.invoker.toStr()
+    pending_reactions[react_key] = true
     c.Send({
       cmd: "slash_response",
       channel: msg.channel,
       response: content,
       command: msg.command,
-      invoker: msg.invoker,
-      listener: listener
+      invoker: msg.invoker
     })
-    while !recent_message_listeners.contains(listener) (
-      wait 0.1
-    )
-    return getListenedMessage(listener)
+    return {}
   )
   object data = rawToMsg(msg)
   string listener = randomString(20)
@@ -178,7 +183,11 @@ def sendResponse(*Connection c, object msg, string content) object (
   while !recent_message_listeners.contains(listener) (
     wait 0.1
   )
-  return getListenedMessage(listener)
+  object sent = getListenedMessage(listener)
+  if sent.id != null and sent.id.toStr() != "" (
+    reactToMessage(c, sent.channel.toStr(), sent.id.toStr(), "💰")
+  )
+  return sent
 )
 
 def sendReply(*Connection c, object msg, string content) object (

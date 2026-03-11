@@ -1,0 +1,38 @@
+
+def registerMiscCommands() (
+  registerSlashCommand("personality", personality, {
+    name: "personality",
+    description: "View or change the bot personality",
+    options: [
+      {
+        name: "action",
+        description: "Action to perform: set, get, or list",
+        type: "enum",
+        choices: ["set", "get", "list"],
+        required: false
+      },
+      {
+        name: "name",
+        description: "Personality name (required when action is set)",
+        type: "str",
+        required: false
+      }
+    ],
+    ephemeral: true
+  })
+
+  registerSlashCommand("tod", tod, {
+    name: "tod",
+    description: "Play truth or dare",
+    options: [
+      {
+        name: "mode",
+        description: "Choose truth or dare",
+        type: "enum",
+        choices: ["truth", "dare"],
+        required: false
+      }
+    ],
+    ephemeral: false
+  })
+)

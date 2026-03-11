@@ -1,0 +1,3 @@
+def gamble(*Connection c, object msg) (
+  sendResponse(c, msg, "This command is currently disabled. If you want more credits: https://ko-fi.com/s/eebeb7269f")
+)

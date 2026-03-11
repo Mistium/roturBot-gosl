@@ -1,0 +1,32 @@
+def friends_add(*Connection c, object msg) (
+  string username = ""
+
+  any msg_args = msg.args
+  if typeof(msg_args) == "object" (
+    object args = msg_args.assert(object)
+    if args.contains("username") (
+      username = args.username.toStr()
+    )
+  )
+
+  if username == "" (
+    sendResponse(c, msg, "Usage: /friends add <username>")
+    return
+  )
+
+  string token = getToken(msg.user)
+  if token == "" (
+    sendResponse(c, msg, "Could not retrieve your auth token.")
+    return
+  )
+
+  object resp = friendsRequest(token, username)
+
+  if resp.error != null (
+    sendResponse(c, msg, resp.error.toStr())
+    return
+  )
+
+  string message = (resp.message ?? ("Friend request sent to " ++ username ++ ".")).toStr()
+  sendResponse(c, msg, message)
+)

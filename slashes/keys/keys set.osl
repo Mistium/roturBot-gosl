@@ -28,20 +28,13 @@ def keys_set(*Connection c, object msg) (
     return
   )
 
-  object data = getUserData(msg.user)
-
-  if data.error != null (
-    sendResponse(c, msg, data.error.toStr())
+  string token = getToken(msg.user)
+  if token == "" (
+    sendResponse(c, msg, "Could not retrieve your auth token.")
     return
   )
 
-  if !data.contains("keys") (
-    data.keys = {}
-  )
-
-  data.keys[keyname] = value
-
-  object resp = users_patch(data.key, keyname, value)
+  object resp = users_patch(token, keyname, value)
 
   if resp.error != null (
     sendResponse(c, msg, resp.error.toStr())

@@ -1,0 +1,50 @@
+
+def registerKeysCommands() (
+  registerSlashCommand("keys get", keys_get, {
+    name: "keys get",
+    description: "Get a value from your user data",
+    options: [
+      {
+        name: "keyname",
+        description: "The key to retrieve",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: true
+  })
+
+  registerSlashCommand("keys set", keys_set, {
+    name: "keys set",
+    description: "Set a value in your user data",
+    options: [
+      {
+        name: "keyname",
+        description: "The key to set",
+        type: "str",
+        required: true
+      },
+      {
+        name: "value",
+        description: "The value to store",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: true
+  })
+
+  registerSlashCommand("keys del", keys_del, {
+    name: "keys del",
+    description: "Delete a key from your account",
+    options: [
+      {
+        name: "keyname",
+        description: "The key to delete",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: true
+  })
+)

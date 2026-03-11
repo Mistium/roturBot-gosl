@@ -6,7 +6,17 @@ def queryAI(array messages, string tier, bool use_tools, array tools) object (
   )
 
   api_key = (config["nvidia-api"] ?? api_key).toStr()
+
+  // Tier-based model selection matching Python version:
+  // Lite → gpt-oss-120b
+  // Plus/Drive/Pro/Max → z-ai/glm4.7 with thinking enabled
   string model_to_use = "openai/gpt-oss-120b"
+  bool use_thinking = false
+
+  if tier != "Lite" (
+    model_to_use = "z-ai/glm4.7"
+    use_thinking = true
+  )
 
   object body = {
     model: model_to_use,
@@ -15,6 +25,13 @@ def queryAI(array messages, string tier, bool use_tools, array tools) object (
     top_p: 1,
     max_tokens: 16384
   }
+
+  if use_thinking (
+    body.chat_template_kwargs = {
+      enable_thinking: true,
+      clear_thinking: false
+    }
+  )
 
   if use_tools and tools.len > 0 (
     body.tools = tools

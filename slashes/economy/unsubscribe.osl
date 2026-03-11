@@ -1,0 +1,37 @@
+def unsubscribe(*Connection c, object msg) (
+  object user = getUserData(msg.user)
+
+  if user.error != null (
+    sendResponse(c, msg, user.error.toStr())
+    return
+  )
+
+  string token = (user.key ?? "").toStr()
+  if token == "" (
+    sendResponse(c, msg, "No auth token found for your account.")
+    return
+  )
+
+  any sub = user["sys.subscription"]
+  string tier = "Free"
+  if sub != null (
+    if typeof(sub) == "object" (
+      object sub_obj = sub.assert(object)
+      tier = (sub_obj.tier ?? "Free").toStr()
+    )
+  )
+
+  if tier != "Lite" (
+    sendResponse(c, msg, "You are not subscribed to Lite.")
+    return
+  )
+
+  object resp = keysCancel("4f229157f0c40f5a98cbf28efd39cfe8", token)
+
+  if resp.error != null (
+    sendResponse(c, msg, resp.error.toStr())
+    return
+  )
+
+  sendResponse(c, msg, "You have successfully unsubscribed from Lite.")
+)

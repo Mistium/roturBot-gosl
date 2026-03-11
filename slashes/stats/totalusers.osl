@@ -1,0 +1,11 @@
+def totalusers(*Connection c, object msg) (
+  object stats = getStatsUsers()
+
+  if stats.error != null (
+    sendResponse(c, msg, "Error fetching user statistics.")
+    return
+  )
+
+  string total = (stats.total_users ?? "unknown").toStr()
+  sendResponse(c, msg, "Total rotur users: " ++ total)
+)

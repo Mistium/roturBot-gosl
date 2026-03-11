@@ -1,0 +1,58 @@
+def requests_reject_all(*Connection c, object msg) (
+  object user = fetchUserData(msg.user)
+
+  if user.error != null (
+    sendResponse(c, msg, user.error.toStr())
+    return
+  )
+
+  string token = (token_cache[msg.user.toStr()] ?? "").toStr()
+  if token == "" (
+    sendResponse(c, msg, "No auth token found for your account.")
+    return
+  )
+
+  any reqs = user["sys.requests"]
+
+  if reqs == null (
+    sendResponse(c, msg, "You have no pending friend requests.")
+    return
+  )
+
+  if typeof(reqs) != "array" (
+    sendResponse(c, msg, "You have no pending friend requests.")
+    return
+  )
+
+  array arr = reqs.assert(array)
+  if arr.len == 0 (
+    sendResponse(c, msg, "You have no pending friend requests.")
+    return
+  )
+
+  array rejected = []
+  array failed = []
+
+  for i arr.len (
+    string username = arr[i].toStr()
+    object resp = friendsReject(token, username)
+    if resp.error != null (
+      failed.append(username ++ " (" ++ resp.error.toStr() ++ ")")
+    ) else (
+      rejected.append(username)
+    )
+  )
+
+  string result = "Rejected " ++ rejected.len.toStr() ++ " request(s)."
+  if failed.len > 0 (
+    result = result ++ " Failed: " ++ failed.len.toStr() ++ "."
+  )
+  if rejected.len > 0 (
+    result = result ++ "\nRejected: " ++ rejected.join(", ")
+  )
+  if failed.len > 0 (
+    result = result ++ "\nFailed: " ++ failed.join(", ")
+  )
+
+  sendResponse(c, msg, result)
+)

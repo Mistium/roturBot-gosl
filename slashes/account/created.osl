@@ -1,0 +1,20 @@
+def created(*Connection c, object msg) (
+  object user = getUserData(msg.user)
+
+  if user.error != null (
+    sendResponse(c, msg, user.error.toStr())
+    return
+  )
+
+  any created_at = user.created
+
+  if created_at == null (
+    sendResponse(c, msg, "Account creation date not available.")
+    return
+  )
+
+  number ts = created_at.toNum()
+  number ts_seconds = (ts / 1000).toNum()
+
+  sendResponse(c, msg, "Your account was created at timestamp: " ++ ts_seconds.toStr() ++ " (unix seconds)")
+)

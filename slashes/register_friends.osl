@@ -1,0 +1,86 @@
+
+def registerFriendsCommands() (
+  registerSlashCommand("friends add", friends_add, {
+    name: "friends add",
+    description: "Send a friend request to a user",
+    options: [
+      {
+        name: "username",
+        description: "The username to send a friend request to",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: false
+  })
+
+  registerSlashCommand("friends remove", friends_remove, {
+    name: "friends remove",
+    description: "Remove a friend",
+    options: [
+      {
+        name: "username",
+        description: "The username to remove from your friends list",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: false
+  })
+
+  registerSlashCommand("friends list", friends_list, {
+    name: "friends list",
+    description: "List your friends",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("requests list", requests_list, {
+    name: "requests list",
+    description: "List your incoming friend requests",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("requests accept", requests_accept, {
+    name: "requests accept",
+    description: "Accept a friend request from a user",
+    options: [
+      {
+        name: "username",
+        description: "The username whose request you want to accept",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: false
+  })
+
+  registerSlashCommand("requests reject", requests_reject, {
+    name: "requests reject",
+    description: "Reject a friend request from a user",
+    options: [
+      {
+        name: "username",
+        description: "The username whose request you want to reject",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: false
+  })
+
+  registerSlashCommand("requests accept all", requests_accept_all, {
+    name: "requests accept all",
+    description: "Accept all pending friend requests",
+    options: [],
+    ephemeral: false
+  })
+
+  registerSlashCommand("requests reject all", requests_reject_all, {
+    name: "requests reject all",
+    description: "Reject all pending friend requests",
+    options: [],
+    ephemeral: false
+  })
+)

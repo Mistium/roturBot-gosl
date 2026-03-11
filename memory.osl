@@ -1,0 +1,211 @@
+// Memory System for roturbot-gosl
+// Provides per-channel persistent memory stored as JSON files in ./store/memories/
+
+def _getMemoryFile(string channel_id) string (
+  return "./store/memories/" ++ channel_id ++ ".json"
+)
+
+def _loadMemories(string channel_id) array (
+  string path = _getMemoryFile(channel_id)
+  string data = fs.ReadFile(path)
+  if data.len == 0 (
+    return []
+  )
+  any parsed = data.JsonParse()
+  if typeof(parsed) != "object" (
+    return []
+  )
+  object obj = parsed.assert(object)
+  any mems = obj.memories
+  if typeof(mems) != "array" (
+    return []
+  )
+  return mems.assert(array)
+)
+
+def _saveMemories(string channel_id, array memories) (
+  string path = _getMemoryFile(channel_id)
+  object data = { memories: memories }
+  fs.WriteFile(path, data.toStr())
+)
+
+def saveMemory(string channel_id, string content, array tags, number importance, number ttl_days) object (
+  if content.len == 0 (
+    return { error: "content is required" }
+  )
+
+  if importance < 1 (
+    importance = 1
+  )
+  if importance > 10 (
+    importance = 10
+  )
+  if ttl_days < 1 (
+    ttl_days = 30
+  )
+
+  array memories = _loadMemories(channel_id)
+
+  number expires_at = timestamp + (ttl_days * 86400000)
+
+  string mem_id = randomString(16)
+
+  object memory = {
+    id: mem_id,
+    content: content,
+    tags: tags,
+    importance: importance,
+    created_at: timestamp,
+    expires_at: expires_at,
+    access_count: 0
+  }
+
+  memories.append(memory)
+  _saveMemories(channel_id, memories)
+
+  return { success: true, id: mem_id, content: content, tags: tags, importance: importance, expires_at: expires_at }
+)
+
+def searchMemories(string channel_id, string query, array tags_filter, number min_importance, number limit) array (
+  if limit < 1 (
+    limit = 5
+  )
+
+  array memories = _loadMemories(channel_id)
+  number now = timestamp
+
+  // Filter out expired and low-importance memories
+  array active = []
+  for i memories.len (
+    object mem = memories[i].assert(object)
+    number exp = (mem.expires_at ?? 0).toNum()
+    if exp > 0 and exp < now (
+      continue
+    )
+    number imp = (mem.importance ?? 1).toNum()
+    if imp < min_importance (
+      continue
+    )
+    if tags_filter.len > 0 (
+      any mem_tags_raw = mem.tags
+      if typeof(mem_tags_raw) != "array" (
+        continue
+      )
+      array mem_tags = mem_tags_raw.assert(array)
+      bool has_tag = false
+      for j tags_filter.len (
+        string want_tag = tags_filter[j].toStr()
+        for k mem_tags.len (
+          if mem_tags[k].toStr() == want_tag (
+            has_tag = true
+          )
+        )
+      )
+      if !has_tag (
+        continue
+      )
+    )
+    active.append(mem)
+  )
+
+  if active.len == 0 (
+    return []
+  )
+
+  // Simple fuzzy match: score by how many words from query appear in content
+  string query_lower = query.toLower()
+  array query_words = query_lower.split(" ")
+
+  array scored = []
+  for i active.len (
+    object mem = active[i].assert(object)
+    string content_lower = mem.content.toStr().toLower()
+    number score = 0
+    for j query_words.len (
+      string word = query_words[j].toStr()
+      if word.len > 2 and content_lower.contains(word) (
+        score += 1
+      )
+    )
+    scored.append({ mem: mem, score: score })
+  )
+
+  // Sort descending by score (bubble sort - OSL has no native sort)
+  for i scored.len (
+    for j scored.len - 1 (
+      if j < 1 (
+        continue
+      )
+      object a = scored[j - 1].assert(object)
+      object b = scored[j].assert(object)
+      if a.score.toNum() < b.score.toNum() (
+        scored[j - 1] = b
+        scored[j] = a
+      )
+    )
+  )
+
+  array results = []
+  number take = limit
+  if take > scored.len.toNum() (
+    take = scored.len.toNum()
+  )
+  for i take (
+    object entry = scored[i].assert(object)
+    results.append(entry.mem)
+  )
+
+  return results
+)
+
+def updateMemory(string channel_id, string memory_id, string action, number new_ttl_days, number importance_boost) object (
+  array memories = _loadMemories(channel_id)
+
+  number found_idx = -1
+  for i memories.len (
+    object mem = memories[i].assert(object)
+    if mem.id.toStr() == memory_id (
+      found_idx = i.toNum()
+    )
+  )
+
+  if found_idx < 0 (
+    return { error: "Memory not found" }
+  )
+
+  if action == "delete" (
+    array new_mems = []
+    for i memories.len (
+      if i != found_idx (
+        new_mems.append(memories[i])
+      )
+    )
+    _saveMemories(channel_id, new_mems)
+    return { success: true, action: "deleted" }
+  )
+
+  object mem = memories[found_idx].assert(object)
+
+  if action == "extend" (
+    if new_ttl_days < 1 (
+      new_ttl_days = 30
+    )
+    mem.expires_at = timestamp + (new_ttl_days * 86400000)
+    memories[found_idx] = mem
+  ) else if action == "increase_importance" (
+    if importance_boost < 1 (
+      importance_boost = 1
+    )
+    number new_imp = mem.importance.toNum() + importance_boost
+    if new_imp > 10 (
+      new_imp = 10
+    )
+    mem.importance = new_imp
+    memories[found_idx] = mem
+  ) else (
+    return { error: "Unknown action: " ++ action }
+  )
+
+  _saveMemories(channel_id, memories)
+  return { success: true, memory: mem }
+)

@@ -1,0 +1,79 @@
+
+def registerSocialCommands() (
+  registerSlashCommand("follow", follow, {
+    name: "follow",
+    description: "Follow a user on rotur",
+    options: [
+      {
+        name: "username",
+        description: "The username of the user to follow",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: false
+  })
+
+  registerSlashCommand("unfollow", unfollow, {
+    name: "unfollow",
+    description: "Unfollow a user on rotur",
+    options: [
+      {
+        name: "username",
+        description: "The username of the user to unfollow",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: false
+  })
+
+  registerSlashCommand("following", following, {
+    name: "following",
+    description: "View users you are following",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("most_followed", most_followed, {
+    name: "most_followed",
+    description: "See the leaderboard of the most followed users",
+    options: [],
+    ephemeral: false
+  })
+
+  registerSlashCommand("block", block, {
+    name: "block",
+    description: "Block a user on rotur",
+    options: [
+      {
+        name: "username",
+        description: "The username of the user to block",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: true
+  })
+
+  registerSlashCommand("unblock", unblock, {
+    name: "unblock",
+    description: "Unblock a user on rotur",
+    options: [
+      {
+        name: "username",
+        description: "The username of the user to unblock",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: true
+  })
+
+  registerSlashCommand("blocked", blocked, {
+    name: "blocked",
+    description: "View users you are blocking",
+    options: [],
+    ephemeral: true
+  })
+)

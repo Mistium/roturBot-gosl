@@ -1,0 +1,33 @@
+def tod(*Connection c, object msg) (
+  string mode = "truth"
+
+  any msg_args = msg.args
+  if typeof(msg_args) == "object" (
+    object args = msg_args.assert(object)
+    if args.contains("mode") (
+      mode = args.mode.toStr()
+    )
+  )
+
+  if mode != "truth" and mode != "dare" (
+    mode = "truth"
+  )
+
+  object resp = requests.Get("https://api.truthordarebot.xyz/v1/" ++ mode)
+
+  if !resp.success (
+    sendResponse(c, msg, "Sorry, couldn't fetch a question right now.")
+    return
+  )
+
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    sendResponse(c, msg, "Sorry, couldn't fetch a question right now.")
+    return
+  )
+
+  object data = parsed.assert(object)
+  string question = (data.question ?? "No question available").toStr()
+
+  sendResponse(c, msg, mode.toUpper() ++ " for " ++ msg.user.toStr() ++ ": " ++ question)
+)

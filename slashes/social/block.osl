@@ -1,0 +1,31 @@
+def block(*Connection c, object msg) (
+  string username = ""
+
+  any msg_args = msg.args
+  if typeof(msg_args) == "object" (
+    object args = msg_args.assert(object)
+    if args.contains("username") (
+      username = args.username.toStr()
+    )
+  )
+
+  if username == "" (
+    sendResponse(c, msg, "Usage: /block <username>")
+    return
+  )
+
+  string token = getToken(msg.user)
+  if token == "" (
+    sendResponse(c, msg, "Could not retrieve your auth token.")
+    return
+  )
+
+  object resp = blockUser(token, username)
+
+  if resp.error != null (
+    sendResponse(c, msg, resp.error.toStr())
+    return
+  )
+
+  sendResponse(c, msg, "You are now blocking " ++ username ++ ".")
+)

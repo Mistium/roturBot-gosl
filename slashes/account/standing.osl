@@ -1,0 +1,47 @@
+def standing(*Connection c, object msg) (
+  object data = getUserStanding(msg.user)
+
+  if data.error != null (
+    sendResponse(c, msg, "Failed to fetch standing data: " ++ data.error.toStr())
+    return
+  )
+
+  string current_standing = (data.standing ?? "good").toStr()
+  any recover_at = data.recover_at
+  any history = data.history
+
+  string output = "Standing for " ++ msg.user.toStr() ++ "\nCurrent Level: " ++ current_standing.toUpper()
+
+  if recover_at != null (
+    number recover_ts = recover_at.toNum()
+    if recover_ts > 0 (
+      output = output ++ "\nAutomatic Recovery: unix timestamp " ++ recover_ts.toStr()
+    )
+  )
+
+  if history != null (
+    if typeof(history) == "array" (
+      array history_arr = history.assert(array)
+      if history_arr.len > 0 (
+        output = output ++ "\n\nRecent History:"
+        number show_from = (history_arr.len - 10).toNum()
+        if show_from < 0 (
+          show_from = 0
+        )
+        for i history_arr.len (
+          if i >= show_from (
+            any entry = history_arr[i]
+            if typeof(entry) == "object" (
+              object e = entry.assert(object)
+              string level = (e.level ?? "unknown").toStr()
+              string reason = (e.reason ?? "No reason").toStr()
+              output = output ++ "\n- " ++ level.toUpper() ++ " - " ++ reason
+            )
+          )
+        )
+      )
+    )
+  )
+
+  sendResponse(c, msg, output)
+)

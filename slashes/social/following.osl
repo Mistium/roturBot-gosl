@@ -1,0 +1,27 @@
+def following(*Connection c, object msg) (
+  object data = getFollowing(msg.user)
+
+  if data.error != null (
+    sendResponse(c, msg, data.error.toStr())
+    return
+  )
+
+  any following_list = data.following
+  if following_list == null (
+    sendResponse(c, msg, "You are not following any users.")
+    return
+  )
+
+  if typeof(following_list) != "array" (
+    sendResponse(c, msg, "You are not following any users.")
+    return
+  )
+
+  array arr = following_list.assert(array)
+  if arr.len == 0 (
+    sendResponse(c, msg, "You are not following any users.")
+    return
+  )
+
+  sendResponse(c, msg, "Users you are following:\n" ++ arr.join("\n"))
+)

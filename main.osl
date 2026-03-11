@@ -1,6 +1,8 @@
 import "osl/ws"
 import "osl/requests"
 import "osl/fs"
+import "osl/crypto"
+import "osl/arrays"
 
 string API_BASE = "https://api.rotur.dev"
 
@@ -12,6 +14,12 @@ object commands = {}
 object slash_schemas = {}
 object channel_messages = {}
 object user_personalities = {}
+
+object token_cache = {}
+object pending_reactions = {}
+string connect_url = ""
+any boot_raw = null
+"*Connection" boot_conn = null
 
 object config = openObjectFile("./config.json")
 string ADMIN_TOKEN = config.admin_token ?? ""
@@ -32,16 +40,69 @@ import "./handler.osl"
 import "./rotur.osl"
 import "./message_cache.osl"
 import "./helpers.osl"
+import "./memory.osl"
+import "./emotional_state.osl"
+import "./relationship.osl"
 
 import "./commands/hello.osl"
 import "./commands/roturacc.osl"
 
-import "./slashes/balance.osl"
-import "./slashes/transfer.osl"
+// account
+import "./slashes/account/usage.osl"
+import "./slashes/account/created.osl"
+import "./slashes/account/allkeys.osl"
+import "./slashes/account/changepass.osl"
+import "./slashes/account/refresh_token.osl"
+import "./slashes/account/standing.osl"
 
-import "./slashes/keys get.osl"
-import "./slashes/keys set.osl"
-import "./slashes/personality.osl"
+// economy
+import "./slashes/economy/balance.osl"
+import "./slashes/economy/daily.osl"
+import "./slashes/economy/transfer.osl"
+import "./slashes/economy/subscribe.osl"
+import "./slashes/economy/unsubscribe.osl"
+import "./slashes/economy/gamble.osl"
+
+// keys
+import "./slashes/keys/keys get.osl"
+import "./slashes/keys/keys set.osl"
+import "./slashes/keys/keys del.osl"
+
+// social
+import "./slashes/social/follow.osl"
+import "./slashes/social/unfollow.osl"
+import "./slashes/social/following.osl"
+import "./slashes/social/most_followed.osl"
+import "./slashes/social/block.osl"
+import "./slashes/social/unblock.osl"
+import "./slashes/social/blocked.osl"
+
+// friends
+import "./slashes/friends/friends add.osl"
+import "./slashes/friends/friends remove.osl"
+import "./slashes/friends/friends list.osl"
+import "./slashes/friends/requests list.osl"
+import "./slashes/friends/requests accept.osl"
+import "./slashes/friends/requests reject.osl"
+import "./slashes/friends/requests accept all.osl"
+import "./slashes/friends/requests reject all.osl"
+
+// stats
+import "./slashes/stats/totalusers.osl"
+import "./slashes/stats/accorigins.osl"
+
+// misc
+import "./slashes/misc/personality.osl"
+import "./slashes/misc/tod.osl"
+
+// slash command registration
+import "./slashes/register_account.osl"
+import "./slashes/register_economy.osl"
+import "./slashes/register_keys.osl"
+import "./slashes/register_social.osl"
+import "./slashes/register_friends.osl"
+import "./slashes/register_stats.osl"
+import "./slashes/register_misc.osl"
 
 import "./handlers/message_new.osl"
 
@@ -50,104 +111,28 @@ mainloop:
   registerCommand("!hello", hello)
   registerCommand("!roturacc", roturacc)
 
-  registerSlashCommand("balance", balance, {
-    name: "balance",
-    description: "Check your current credit balance",
-    options: [],
-    ephemeral: true
-  })
-
-  registerSlashCommand("transfer", transfer, {
-    name: "transfer",
-    description: "Transfer credits to another user",
-    options: [
-      {
-        name: "username",
-        description: "The user to transfer credits to",
-        type: "str",
-        required: true
-      },
-      {
-        name: "amount",
-        description: "Amount of credits to transfer",
-        type: "float",
-        required: true
-      },
-      {
-        name: "note",
-        description: "Optional note for the transfer",
-        type: "str",
-        required: false
-      }
-    ],
-    ephemeral: true
-  })
-
-  registerSlashCommand("keys get", keys_get, {
-    name: "keys get",
-    description: "Get a value from your user data",
-    options: [
-      {
-        name: "keyname",
-        description: "The key to retrieve",
-        type: "str",
-        required: true
-      }
-    ],
-    ephemeral: true
-  })
-  registerSlashCommand("keys set", keys_set, {
-    name: "keys set",
-    description: "Set a value in your user data",
-    options: [
-      {
-        name: "keyname",
-        description: "The key to set",
-        type: "str",
-        required: true
-      },
-      {
-        name: "value",
-        description: "The value to store",
-        type: "str",
-        required: true
-      }
-    ],
-    ephemeral: true
-  })
-
-  registerSlashCommand("personality", personality, {
-    name: "personality",
-    description: "View or change the bot personality",
-    options: [
-      {
-        name: "action",
-        description: "Action to perform: set, get, or list",
-        type: "enum",
-        choices: ["set", "get", "list"],
-        required: false
-      },
-      {
-        name: "name",
-        description: "Personality name (required when action is set)",
-        type: "str",
-        required: false
-      }
-    ],
-    ephemeral: true
-  })
+  registerAccountCommands()
+  registerEconomyCommands()
+  registerKeysCommands()
+  registerSocialCommands()
+  registerFriendsCommands()
+  registerStatsCommands()
+  registerMiscCommands()
 
   for i servers.len (
-    auto connection = ws.Connect(servers[i].toStr())
-    if connection == null (
+    connect_url = servers[i].toStr()
+    boot_raw = ws.Connect(connect_url)
+    if boot_raw == null (
       continue
     )
-    connection.OnMessage(messageHandler)
-    connection.OnClose(closeHandler)
-    connection.data.serverUrl = servers[i]
-    connections[servers[i]] = connection
+    boot_conn = boot_raw.assert("*Connection")
+    boot_conn.OnMessage(messageHandler)
+    boot_conn.EnableReconnect()
+    boot_conn.data.serverUrl = connect_url
+    connections[connect_url] = boot_conn
   )
 
   while true (
-    wait 100
+    wait 60000
+    checkDailyReset()
   )

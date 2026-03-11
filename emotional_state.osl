@@ -1,0 +1,79 @@
+// Emotional State System for roturbot-gosl
+// Manages per-channel emotional states, persisted to ./store/emotional_states.json
+
+def _loadEmotionalStates() object (
+  string data = fs.ReadFile("./store/emotional_states.json")
+  if data.len == 0 (
+    return {}
+  )
+  any parsed = data.JsonParse()
+  if typeof(parsed) != "object" (
+    return {}
+  )
+  return parsed.assert(object)
+)
+
+def _saveEmotionalStates(object data) (
+  fs.WriteFile("./store/emotional_states.json", data.toStr())
+)
+
+def setEmotionalState(string channel_id, string state, string reason) object (
+  // Validate state against known emotional states
+  string valid_states = "neutral happy excited content amused sad upset angry frustrated disappointed confused surprised curious thoughtful calm anxious nervous embarrassed proud grateful"
+  if !valid_states.contains(state) (
+    return { error: "Invalid emotional state: " ++ state ++ ". Must be one of: neutral, happy, excited, content, amused, sad, upset, angry, frustrated, disappointed, confused, surprised, curious, thoughtful, calm, anxious, nervous, embarrassed, proud, grateful" }
+  )
+
+  object data = _loadEmotionalStates()
+  data[channel_id] = {
+    state: state,
+    reason: reason,
+    last_updated: timestamp
+  }
+  _saveEmotionalStates(data)
+  return { success: true, channel_id: channel_id, state: state, reason: reason }
+)
+
+def getEmotionalState(string channel_id) object (
+  object data = _loadEmotionalStates()
+  if data.contains(channel_id) (
+    return data[channel_id].assert(object)
+  )
+  return { state: "neutral", reason: "Default state" }
+)
+
+def resetEmotionalState(string channel_id) object (
+  object data = _loadEmotionalStates()
+  if data.contains(channel_id) (
+    data.delete(channel_id)
+    _saveEmotionalStates(data)
+  )
+  return { success: true, channel_id: channel_id, state: "neutral" }
+)
+
+def modifyEmotionalState(string action, string channel_id, string state, string reason) object (
+  if action == "set" (
+    if state.len == 0 or reason.len == 0 (
+      return { error: "state and reason are required for set action" }
+    )
+    return setEmotionalState(channel_id, state, reason)
+  )
+  if action == "reset" (
+    return resetEmotionalState(channel_id)
+  )
+  return { error: "Invalid action: " ++ action ++ ". Use set or reset." }
+)
+
+def getFormattedEmotionalState(string channel_id) string (
+  object es = getEmotionalState(channel_id)
+  string state = (es.state ?? "neutral").toStr()
+  string reason = (es.reason ?? "").toStr()
+  if state == "neutral" and reason == "Default state" (
+    return ""
+  )
+  string result = "You are currently feeling " ++ state
+  if reason.len > 0 (
+    result ++= " because " ++ reason
+  )
+  return result
+)

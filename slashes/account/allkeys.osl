@@ -1,0 +1,26 @@
+def allkeys(*Connection c, object msg) (
+  object user = getUserData(msg.user)
+
+  if user.error != null (
+    sendResponse(c, msg, user.error.toStr())
+    return
+  )
+
+  array keys = user.getKeys()
+  array blocked = ["username", "discord_id", "key", "pfp", "banner", "password"]
+
+  array output_keys = []
+  for i keys.len (
+    string k = keys[i].toStr()
+    if !blocked.contains(k) (
+      output_keys.append(k)
+    )
+  )
+
+  if output_keys.len == 0 (
+    sendResponse(c, msg, "No keys found in your account.")
+    return
+  )
+
+  sendResponse(c, msg, output_keys.join(", "))
+)

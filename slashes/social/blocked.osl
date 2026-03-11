@@ -1,0 +1,28 @@
+def blocked(*Connection c, object msg) (
+  object user = getUserData(msg.user)
+
+  if user.error != null (
+    sendResponse(c, msg, user.error.toStr())
+    return
+  )
+
+  any blocked_list = user["sys.blocked"]
+
+  if blocked_list == null (
+    sendResponse(c, msg, "You are not blocking anyone.")
+    return
+  )
+
+  if typeof(blocked_list) != "array" (
+    sendResponse(c, msg, "You are not blocking anyone.")
+    return
+  )
+
+  array arr = blocked_list.assert(array)
+  if arr.len == 0 (
+    sendResponse(c, msg, "You are not blocking anyone.")
+    return
+  )
+
+  sendResponse(c, msg, "Users you are blocking:\n" ++ arr.join("\n"))
+)

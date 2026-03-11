@@ -60,241 +60,422 @@ def buildAIMessages(object user, string prompt, string personality, string chann
     content: personality
   })
 
-    string user_context = "You are talking to the rotur user named: " ++ (user.username ?? "someone")
-    user_context ++= ". On discord they are " ++ (user.discord_id ?? "unknown")
-    user_context ++= " with display name: " ++ (user.display_name ?? user.username ?? "unknown")
-    user_context ++= ". You are chatting in " ++ channel_id ++ "."
+  string user_context = "You are talking to the rotur user named: " ++ (user.username ?? "someone")
+  user_context ++= ". On discord they are " ++ (user.discord_id ?? "unknown")
+  user_context ++= " with display name: " ++ (user.display_name ?? user.username ?? "unknown")
+  user_context ++= ". You are chatting in " ++ channel_id ++ "."
+  user_context ++= " Channel ID: " ++ channel_id ++ " - Use this channel_id for save_memory and search_memories tool calls."
 
+  messages.append({
+    role: "system",
+    content: user_context
+  })
+
+  // Inject emotional state context
+  string emotional_state = getFormattedEmotionalState(channel_id)
+  if emotional_state.len > 0 (
     messages.append({
-        role: "system",
-        content: user_context
+      role: "assistant",
+      content: emotional_state
     })
+  )
 
-    string history = getMessageHistory(channel_id)
-    if history.len > 0 (
-        messages.append({
-            role: "system",
-            content: "RECENT CHANNEL CONTEXT (last 40 messages):\n\n" ++ history
-        })
+  // Inject relationship thoughts for this user
+  string user_id = (user.discord_id ?? user.username ?? "").toStr()
+  string relationship_thoughts = getFormattedThoughts(user_id)
+  if relationship_thoughts.len > 0 (
+    messages.append({
+      role: "assistant",
+      content: relationship_thoughts
+    })
+  )
+
+  // Inject relevant memories
+  string username = (user.username ?? "").toStr()
+  array tags_filter = []
+  if username.len > 0 (
+    tags_filter.append("user:" ++ username)
+  )
+  array user_memories = searchMemories(channel_id, "user:" ++ username, tags_filter, 1, 5)
+  array general_memories = searchMemories(channel_id, prompt, [], 7, 8)
+
+  // Combine without duplicates
+  array all_memories = []
+  object seen_mem_ids = {}
+  for i user_memories.len (
+    object mem = user_memories[i].assert(object)
+    string mid = (mem.id ?? "").toStr()
+    if !seen_mem_ids.contains(mid) (
+      seen_mem_ids[mid] = true
+      all_memories.append(mem)
     )
+  )
+  for i general_memories.len (
+    object mem = general_memories[i].assert(object)
+    string mid = (mem.id ?? "").toStr()
+    if !seen_mem_ids.contains(mid) (
+      seen_mem_ids[mid] = true
+      all_memories.append(mem)
+    )
+  )
 
+  if all_memories.len > 0 (
+    string memory_text = "RELEVANT MEMORIES:\n"
+    for i all_memories.len (
+      object mem = all_memories[i].assert(object)
+      memory_text ++= "- " ++ mem.content.toStr() ++ "\n"
+    )
     messages.append({
-        role: "user",
-        content: prompt
+      role: "system",
+      content: memory_text
     })
+  )
 
-    return messages
+  string history = getMessageHistory(channel_id)
+  if history.len > 0 (
+    messages.append({
+      role: "system",
+      content: "RECENT CHANNEL CONTEXT (last 40 messages):\n\n" ++ history
+    })
+  )
+
+  messages.append({
+    role: "user",
+    content: prompt
+  })
+
+  return messages
 )
 
 def queryAIWithTools(*Connection c, object reply_msg, array messages, string tier, number depth) object (
-    if depth > 10 (
-        return { error: "Too many tool calls" }
+  if depth > 10 (
+    return { error: "Too many tool calls" }
+  )
+
+  array ai_tools = openArrayFile("./ai/tools.json")
+  object response = queryAI(messages, tier, true, ai_tools)
+
+  object choice = response.choices[1].assert(object)
+  object message = (choice.message ?? {}).assert(object)
+
+  log message
+
+  if message.tool_calls != null and message.tool_calls.len > 0 (
+    array tool_calls = message.tool_calls.assert(array)
+    string content = message.content ?? ""
+
+    object assistant_msg = {
+      role: "assistant",
+      content: content,
+      tool_calls: tool_calls
+    }
+    messages.append(assistant_msg)
+
+    for i tool_calls.len (
+      object tc = tool_calls[i].assert(object)
+      string tc_id = tc.id ?? ""
+      object func_data = (tc.function ?? {}).assert(object)
+      string func_name = func_data.name ?? ""
+      string args_raw = func_data.arguments ?? "{}"
+
+      any args_parsed = args_raw.JsonParse()
+      object args = {}
+      if typeof(args_parsed) == "object" (
+        args = args_parsed.assert(object)
+      )
+
+      string tool_display = formatToolDisplay(func_name, args)
+
+      editMessage(c, reply_msg, tool_display)
+
+      string tool_result = callTool(func_name, args, reply_msg.channel.toStr())
+
+      // Handle silent_exit
+      if tool_result == "__SILENT_EXIT__" (
+        return { choices: [{ message: { content: "" }, finish_reason: "silent_exit" }] }
+      )
+
+      object tool_msg = {
+        role: "tool",
+        tool_call_id: tc_id,
+        content: tool_result
+      }
+      messages.append(tool_msg)
     )
 
-    array ai_tools = openArrayFile("./ai/tools.json")
-    object response = queryAI(messages, tier, true, ai_tools)
+    return queryAIWithTools(c, reply_msg, messages, tier, depth + 1)
+  )
 
-    object choice = response.choices[1].assert(object)
-    object message = (choice.message ?? {}).assert(object)
-
-	log message
-
-    if message.tool_calls != null and message.tool_calls.len > 0 (
-        array tool_calls = message.tool_calls.assert(array)
-        string content = message.content ?? ""
-
-        object assistant_msg = {
-            role: "assistant",
-            content: content,
-            tool_calls: tool_calls
-        }
-        messages.append(assistant_msg)
-
-        for i tool_calls.len (
-            object tc = tool_calls[i].assert(object)
-            string tc_id = tc.id ?? ""
-            object func_data = (tc.function ?? {}).assert(object)
-            string func_name = func_data.name ?? ""
-            string args_raw = func_data.arguments ?? "{}"
-
-            any args_parsed = args_raw.JsonParse()
-            object args = {}
-            if typeof(args_parsed) == "object" (
-                args = args_parsed.assert(object)
-            )
-
-            string tool_display = formatToolDisplay(func_name, args)
-
-            editMessage(c, reply_msg, tool_display)
-
-            string tool_result = callTool(func_name, args)
-
-            object tool_msg = {
-                role: "tool",
-                tool_call_id: tc_id,
-                content: tool_result
-            }
-            messages.append(tool_msg)
-        )
-
-        return queryAIWithTools(c, reply_msg, messages, tier, depth + 1)
-    )
-
-    return response
+  return response
 )
 
 def formatToolDisplay(string func_name, object args) string (
-    string display = func_name
+  string display = func_name
 
-    if func_name == "search_web" and args.contains("query") (
-        display = "researching web: \"" ++ args.query.toStr() ++ "\""
-    ) else if func_name == "describe_image" and args.contains("image_url") (
-        display = "describing image..."
-    ) else if func_name == "get_user" and args.contains("username") (
-        display = "getting user: " ++ args.username.toStr()
-    ) else if func_name == "extract_page" and args.contains("urls") (
-        array urls = args.urls.assert(array)
-        string url_preview = urls[1].toStr() ?? ""
-        display = "reading page: " ++ url_preview
-    ) else if func_name == "get_current_time" (
-        display = "getting current time..."
-    ) else if func_name == "get_timezone_info" and args.contains("timezone") (
-        display = "checking timezone: " ++ args.timezone.toStr()
-    )
+  if func_name == "search_web" and args.contains("query") (
+    display = "researching web: \"" ++ args.query.toStr() ++ "\""
+  ) else if func_name == "describe_image" and args.contains("image_url") (
+    display = "describing image..."
+  ) else if func_name == "get_user" and args.contains("username") (
+    display = "getting user: " ++ args.username.toStr()
+  ) else if func_name == "extract_page" and args.contains("urls") (
+    array urls = args.urls.assert(array)
+    string url_preview = urls[1].toStr() ?? ""
+    display = "reading page: " ++ url_preview
+  ) else if func_name == "get_current_time" (
+    display = "getting current time..."
+  ) else if func_name == "get_timezone_info" and args.contains("timezone") (
+    display = "checking timezone: " ++ args.timezone.toStr()
+  ) else if func_name == "search_lore" and args.contains("query") (
+    display = "searching lore: \"" ++ args.query.toStr() ++ "\""
+  ) else if func_name == "get_posts" and args.contains("username") (
+    display = "getting posts for: " ++ args.username.toStr()
+  ) else if func_name == "search_posts" and args.contains("query") (
+    display = "searching posts: \"" ++ args.query.toStr() ++ "\""
+  ) else if func_name == "convert_timestamp" (
+    display = "converting timestamp..."
+  ) else if func_name == "save_memory" (
+    display = "saving memory..."
+  ) else if func_name == "search_memories" and args.contains("query") (
+    display = "searching memories: \"" ++ args.query.toStr() ++ "\""
+  ) else if func_name == "update_memory" (
+    display = "updating memory..."
+  ) else if func_name == "modify_relationship" (
+    display = "updating relationship thoughts..."
+  ) else if func_name == "modify_emotional_state" and args.contains("action") (
+    display = "updating emotional state (" ++ args.action.toStr() ++ ")..."
+  ) else if func_name == "calculate" and args.contains("expression") (
+    display = "calculating: " ++ args.expression.toStr()
+  ) else if func_name == "silent_exit" (
+    display = "silent exit..."
+  ) else if func_name == "make_web_request" and args.contains("url") (
+    display = "requesting: " ++ args.url.toStr()
+  )
 
-    return "Calling " ++ display
+  return "Calling " ++ display
 )
 
-def callTool(string name, object args) string (
-    switch name (
-		case "describe_image"
-			string image_url = (args.image_url ?? "").toStr()
-			object result = describeImage(image_url)
-			return result.toStr()
+def callTool(string name, object args, string channel_id) string (
+  switch name (
+    case "describe_image"
+      string image_url = (args.image_url ?? "").toStr()
+      object result = describeImage(image_url)
+      return result.toStr()
 
-		case "get_user"
-			string username = (args.username ?? "").toStr()
-			object user = getUserProfile(username)
-			return user.toStr()
+    case "get_user"
+      string username = (args.username ?? "").toStr()
+      object user = getUserProfile(username)
+      return user.toStr()
 
-		case "get_current_time"
-			number ts = timestamp
-			object result = {
-				utc: {
-					iso: "placeholder",
-					unix: ts
-				}
-			}
-			return result.toStr()
+    case "get_current_time"
+      number ts = timestamp
+      object result = {
+        utc: {
+          iso: "see unix timestamp below",
+          unix: ts
+        }
+      }
+      return result.toStr()
 
-		case "get_timezone_info"
-			string tz = (args.timezone ?? "UTC").toStr()
-			object resp = requests.Get("https://apps.mistium.com/timezone-info?timezone=" ++ tz)
-			if resp.success == true and resp.status == 200 (
-				return resp.body.toStr()
-			)
-			return { error: "Failed to get timezone info" }.toStr()
+    case "get_timezone_info"
+      string tz = (args.timezone ?? "UTC").toStr()
+      object resp = requests.Get("https://apps.mistium.com/timezone-info?timezone=" ++ tz)
+      if resp.success == true and resp.status == 200 (
+        return resp.body.toStr()
+      )
+      return { error: "Failed to get timezone info" }.toStr()
 
-		case "search_web"
-			string query = (args.query ?? "").toStr()
-			string tavily_key = (config["tavily-api"] ?? "").toStr()
-			if tavily_key.len == 0 (
-				return { error: "Tavily API key not configured" }.toStr()
-			)
-			object resp = requests.Post("https://api.tavily.com/search", {
-				"Authorization": "Bearer " ++ tavily_key,
-				"Content-Type": "application/json",
-				"body": { query: query }
-			})
-			if resp.success (
-				return resp.body.toStr()
-			)
-			return { error: "Search failed" }.toStr()
+    case "convert_timestamp"
+      number ts = (args.timestamp ?? 0).toNum()
+      return { timestamp: ts, readable: ts.toStr() ++ "ms since epoch" }.toStr()
 
-		case "search_lore"
-			string query = (args.query ?? "").toStr()
-			string tavily_key = (config["tavily-api"] ?? "").toStr()
-			if tavily_key.len == 0 (
-				return { error: "Tavily API key not configured" }.toStr()
-			)
-			object resp = requests.Post("https://api.tavily.com/search", {
-				"Authorization": "Bearer " ++ tavily_key,
-				"Content-Type": "application/json",
-				"body": { query: "originos.fandom.com " ++ query }
-			})
+    case "search_web"
+      string query = (args.query ?? "").toStr()
+      string tavily_key = (config["tavily-api"] ?? "").toStr()
+      if tavily_key.len == 0 (
+        return { error: "Tavily API key not configured" }.toStr()
+      )
+      object resp = requests.Post("https://api.tavily.com/search", {
+        "Authorization": "Bearer " ++ tavily_key,
+        "Content-Type": "application/json",
+        "body": { query: query }
+      })
+      if resp.success (
+        return resp.body.toStr()
+      )
+      return { error: "Search failed" }.toStr()
 
-			if resp.success (
-				any rawresults = resp.body.toStr().JsonParse().results
-				if typeof(rawresults) != "array" (
-					return { error: "Invalid response format" }.toStr()
-				)
-				array results = rawresults.assert(array)
-				array out = []
-				for i results.len (
-					object result = results[i].assert(object)
-					string url = result.url.toStr()
-					if url.startsWith("https://originos.fandom.com") (
-						out.append(url)
-					)
-				)
-				return out.toStr()
-			)
-			return { error: "Search failed" }.toStr()
+    case "search_lore"
+      string query = (args.query ?? "").toStr()
+      string tavily_key = (config["tavily-api"] ?? "").toStr()
+      if tavily_key.len == 0 (
+        return { error: "Tavily API key not configured" }.toStr()
+      )
+      object resp = requests.Post("https://api.tavily.com/search", {
+        "Authorization": "Bearer " ++ tavily_key,
+        "Content-Type": "application/json",
+        "body": { query: "originos.fandom.com " ++ query }
+      })
 
-		case "extract_page"
-			array urls = (args.urls ?? []).assert(array)
-			string tavily_key = (config["tavily-api"] ?? "").toStr()
-			if tavily_key.len == 0 (
-				return { error: "Tavily API key not configured" }.toStr()
-			)
-			object resp = requests.Post("https://api.tavily.com/extract", {
-				"Authorization": "Bearer " ++ tavily_key,
-				"Content-Type": "application/json",
-				"body": { urls: urls }
-			})
-			if resp.success (
-				return resp.body.toStr()
-			)
-			return { error: "Extract failed" }.toStr()
-		
-		case "make_web_request"
-			string method = (args.method ?? "").toStr()
-			string url = (args.url ?? "").toStr()
-			object headers = (args.headers ?? {}).assert(object)
-			string body = (args.body ?? "").toStr()
-			string params = (args.params ?? "").toStr()
-			
-			object resp = requests.Request(method, url, {
-				"headers": headers,
-				"body": body,
-				"params": params
-			})
+      if resp.success (
+        any rawresults = resp.body.toStr().JsonParse().results
+        if typeof(rawresults) != "array" (
+          return { error: "Invalid response format" }.toStr()
+        )
+        array results = rawresults.assert(array)
+        array out = []
+        for i results.len (
+          object result = results[i].assert(object)
+          string url = result.url.toStr()
+          if url.startsWith("https://originos.fandom.com") (
+            out.append(url)
+          )
+        )
+        return out.toStr()
+      )
+      return { error: "Search failed" }.toStr()
 
-			log resp
+    case "extract_page"
+      array urls = (args.urls ?? []).assert(array)
+      string tavily_key = (config["tavily-api"] ?? "").toStr()
+      if tavily_key.len == 0 (
+        return { error: "Tavily API key not configured" }.toStr()
+      )
+      object resp = requests.Post("https://api.tavily.com/extract", {
+        "Authorization": "Bearer " ++ tavily_key,
+        "Content-Type": "application/json",
+        "body": { urls: urls }
+      })
+      if resp.success (
+        return resp.body.toStr()
+      )
+      return { error: "Extract failed" }.toStr()
 
-			return resp.toStr()
-    )
+    case "get_posts"
+      string posts_user = (args.username ?? "").toStr()
+      object posts_result = getPostsByUser(posts_user)
+      return posts_result.toStr()
 
-    return { error: "Unknown tool: " ++ name }.toStr()
+    case "search_posts"
+      string posts_query = (args.query ?? "").toStr()
+      object search_result = searchPostsByQuery(posts_query)
+      return search_result.toStr()
+
+    case "make_web_request"
+      string method = (args.method ?? "").toStr()
+      string url = (args.url ?? "").toStr()
+      object headers = (args.headers ?? {}).assert(object)
+      string body = (args.body ?? "").toStr()
+      string params = (args.params ?? "").toStr()
+
+      object resp = requests.Request(method, url, {
+        "headers": headers,
+        "body": body,
+        "params": params
+      })
+
+      log resp
+
+      return resp.toStr()
+
+    case "save_memory"
+      string mem_content = (args.content ?? "").toStr()
+      any tags_raw = args.tags
+      array mem_tags = []
+      if typeof(tags_raw) == "array" (
+        mem_tags = tags_raw.assert(array)
+      )
+      number mem_importance = (args.importance ?? 5).toNum()
+      number mem_ttl = (args.ttl_days ?? 30).toNum()
+      string mem_channel = channel_id
+      if args.contains("channel_id") (
+        mem_channel = args.channel_id.toStr()
+      )
+      object save_result = saveMemory(mem_channel, mem_content, mem_tags, mem_importance, mem_ttl)
+      return save_result.toStr()
+
+    case "search_memories"
+      string search_query = (args.query ?? "").toStr()
+      any stf_raw = args.tags_filter
+      array search_tags = []
+      if typeof(stf_raw) == "array" (
+        search_tags = stf_raw.assert(array)
+      )
+      number search_min_imp = (args.min_importance ?? 1).toNum()
+      number search_limit = (args.limit ?? 5).toNum()
+      string search_channel = channel_id
+      if args.contains("channel_id") (
+        search_channel = args.channel_id.toStr()
+      )
+      array search_results = searchMemories(search_channel, search_query, search_tags, search_min_imp, search_limit)
+      return search_results.toStr()
+
+    case "update_memory"
+      string update_id = (args.memory_id ?? "").toStr()
+      string update_action = (args.action ?? "").toStr()
+      number update_ttl = (args.new_ttl_days ?? 30).toNum()
+      number update_boost = (args.importance_boost ?? 1).toNum()
+      string update_channel = channel_id
+      if args.contains("channel_id") (
+        update_channel = args.channel_id.toStr()
+      )
+      object update_result = updateMemory(update_channel, update_id, update_action, update_ttl, update_boost)
+      return update_result.toStr()
+
+    case "modify_relationship"
+      string rel_action = (args.action ?? "").toStr()
+      string rel_user_id = (args.user_id ?? "").toStr()
+      string rel_username = (args.username ?? "").toStr()
+      string rel_thoughts = (args.thoughts ?? "").toStr()
+      object rel_result = modifyRelationship(rel_action, rel_user_id, rel_username, rel_thoughts)
+      return rel_result.toStr()
+
+    case "modify_emotional_state"
+      string es_action = (args.action ?? "").toStr()
+      string es_state = (args.state ?? "").toStr()
+      string es_reason = (args.reason ?? "").toStr()
+      object es_result = modifyEmotionalState(es_action, channel_id, es_state, es_reason)
+      return es_result.toStr()
+
+    case "calculate"
+      string expr = (args.expression ?? "").toStr()
+      if expr.len == 0 (
+        return { error: "expression is required" }.toStr()
+      )
+      // OSL does not have a math evaluator; return a note for the AI to compute
+      return { note: "OSL does not support dynamic math evaluation. Expression: " ++ expr ++ " - please compute this yourself." }.toStr()
+
+    case "silent_exit"
+      return "__SILENT_EXIT__"
+  )
+
+  return { error: "Unknown tool: " ++ name }.toStr()
 )
 
 def processResponse(*Connection c, object reply_msg, object response, string tier) (
-    string content = response.choices[1].message.content ?? ""
+  object first_choice = response.choices[1].assert(object)
+  string finish_reason = (first_choice.finish_reason ?? "").toStr()
 
-    if content.len == 0 (
-        editMessage(c, reply_msg, "Sorry, I couldn't generate a response to that.")
-        return
-    )
+  if finish_reason == "silent_exit" (
+    return
+  )
 
-    content = sanitizeContent(content)
+  string content = first_choice.message.content ?? ""
 
-    if tier == "Lite" (
-        content = "(Lite - gpt-oss-120b)\n" ++ content
-    )
+  if content.len == 0 (
+    editMessage(c, reply_msg, "Sorry, I couldn't generate a response to that.")
+    return
+  )
 
-    if content.len > 2000 (
-        content = content.trim(0, 1997) ++ "..."
-    )
+  content = sanitizeContent(content)
 
-    editMessage(c, reply_msg, content)
+  if tier == "Lite" (
+    content = "(Lite - gpt-oss-120b)\n" ++ content
+  )
+
+  if content.len > 2000 (
+    content = content.trim(0, 1997) ++ "..."
+  )
+
+  editMessage(c, reply_msg, content)
 )

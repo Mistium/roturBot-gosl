@@ -1,0 +1,22 @@
+def most_followed(*Connection c, object msg) (
+  array users = getStatsFollowers()
+
+  if users.len == 0 (
+    sendResponse(c, msg, "Error: Unable to retrieve follower data.")
+    return
+  )
+
+  string output = "Most Followed Users:\n"
+
+  for i users.len (
+    any entry = users[i]
+    if typeof(entry) == "object" (
+      object u = entry.assert(object)
+      string username = (u.username ?? "unknown").toStr()
+      string follower_count = (u.follower_count ?? "0").toStr()
+      output = output ++ i.toStr() ++ ". " ++ username ++ " - Followers: " ++ follower_count ++ "\n"
+    )
+  )
+
+  sendResponse(c, msg, output)
+)

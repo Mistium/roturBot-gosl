@@ -1,0 +1,16 @@
+
+def registerStatsCommands() (
+  registerSlashCommand("totalusers", totalusers, {
+    name: "totalusers",
+    description: "Display the total number of rotur users",
+    options: [],
+    ephemeral: false
+  })
+
+  registerSlashCommand("accorigins", accorigins, {
+    name: "accorigins",
+    description: "Get stats on how many accounts are linked to each rotur OS",
+    options: [],
+    ephemeral: false
+  })
+)

@@ -1,0 +1,139 @@
+// daily.osl — /daily claim command + midnight reset
+// Store format: { "date": <unix_day_number>, "claimed": { username: true } }
+
+def loadDailyClaims() object (
+  any raw = fs.ReadFile("./store/daily_claims.json")
+  if raw == null (
+    return { date: 0, claimed: {} }
+  )
+  string raw_str = raw.toStr()
+  if raw_str == "" (
+    return { date: 0, claimed: {} }
+  )
+  any parsed = raw_str.JsonParse()
+  if typeof(parsed) != "object" (
+    return { date: 0, claimed: {} }
+  )
+  object store = parsed.assert(object)
+  if typeof(store.claimed) != "object" (
+    store.claimed = {}
+  )
+  return store
+)
+
+def saveDailyClaims(object store) (
+  fs.WriteFile("./store/daily_claims.json", store.JsonStringify())
+)
+
+def todayDay() number (
+  return (timestamp / 1000 / 86400).round().toNum()
+)
+
+def checkDailyReset() (
+  object store = loadDailyClaims()
+  number today = todayDay()
+
+  if store.date.toNum() == today (
+    return
+  )
+
+  log "New day — resetting daily claims"
+  saveDailyClaims({ date: today, claimed: {} })
+
+  any raw_conn = connections["wss://chats.mistium.com"]
+  if raw_conn != null (
+    "*Connection" conn = raw_conn.assert("*Connection")
+    conn.Send({
+      cmd: "message_new",
+      channel: "general",
+      content: "Daily credits have reset! Use /daily to claim your free credits for today."
+    })
+  )
+)
+
+def daily(*Connection c, object msg) (
+  string username = msg.user.toStr()
+
+  object store = loadDailyClaims()
+  number today = todayDay()
+
+  // reset store if day has changed
+  if store.date.toNum() != today (
+    store = { date: today, claimed: {} }
+    saveDailyClaims(store)
+  )
+
+  object claimed = store.claimed.assert(object)
+
+  if claimed.contains(username) (
+    sendResponse(c, msg, "You already claimed your daily credits today. Come back tomorrow!")
+    return
+  )
+
+  // fetch user data for balance and subscription tier
+  object user = fetchUserData(username)
+  if user.error != null (
+    sendResponse(c, msg, "Could not fetch your account: " ++ user.error.toStr())
+    return
+  )
+
+  number balance = (user["sys.currency"] ?? user.currency ?? 0).toNum()
+
+  // wealth multiplier
+  number wealth_mult = 1
+  if balance > 1000 (
+    wealth_mult = 0
+  ) else if balance > 500 (
+    wealth_mult = 0.5
+  )
+
+  if wealth_mult == 0 (
+    sendResponse(c, msg, "Your balance is too high to receive daily credits (> 1000). Keep spending!")
+    return
+  )
+
+  // subscription multiplier
+  number sub_mult = 1
+  any sub_raw = user["sys.subscription"]
+  if sub_raw != null (
+    if typeof(sub_raw) == "object" (
+      object sub = sub_raw.assert(object)
+      string tier = (sub.tier ?? "Free").toStr().toLower()
+      if tier == "drive" (
+        sub_mult = 2
+      ) else if tier == "pro" or tier == "max" (
+        sub_mult = 3
+      )
+    )
+  )
+
+  number base = 5
+  number awarded = (base * sub_mult * wealth_mult * 100).round().toNum() / 100
+
+  // transfer via admin API
+  string url = API_BASE ++ "/admin/transfer_credits?to=" ++ username ++ "&amount=" ++ awarded.toStr() ++ "&from=rotur&note=daily%20credit"
+  object resp = requests.Post(url, ADMIN_HEADERS)
+
+  any resp_parsed = resp.body.toStr().JsonParse()
+  if typeof(resp_parsed) == "object" (
+    object body = resp_parsed.assert(object)
+    if body.error != null (
+      sendResponse(c, msg, "Failed to award credits: " ++ body.error.toStr())
+      return
+    )
+  )
+
+  // mark as claimed and save immediately
+  claimed[username] = true
+  store.claimed = claimed
+  store.date = today
+  saveDailyClaims(store)
+
+  number new_balance = ((balance + awarded) * 100).round().toNum() / 100
+  string reply = "You claimed " ++ awarded.toStr() ++ " daily credits!"
+  if sub_mult > 1 (
+    reply = reply ++ " (subscription bonus x" ++ sub_mult.toStr() ++ ")"
+  )
+  reply = reply ++ " Balance: " ++ new_balance.toStr()
+  sendResponse(c, msg, reply)
+)

@@ -1,0 +1,51 @@
+
+def registerAccountCommands() (
+  registerSlashCommand("usage", usage, {
+    name: "usage",
+    description: "Check your file system usage",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("created", created, {
+    name: "created",
+    description: "Get the creation date of your account",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("allkeys", allkeys, {
+    name: "allkeys",
+    description: "Get a list of all the keys in your account",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("changepass", changepass, {
+    name: "changepass",
+    description: "Change the password of your rotur account",
+    options: [
+      {
+        name: "new_password",
+        description: "Your new password",
+        type: "str",
+        required: true
+      }
+    ],
+    ephemeral: true
+  })
+
+  registerSlashCommand("refresh_token", refresh_token, {
+    name: "refresh_token",
+    description: "Refresh your rotur auth token",
+    options: [],
+    ephemeral: true
+  })
+
+  registerSlashCommand("standing", standing, {
+    name: "standing",
+    description: "View your current standing and history",
+    options: [],
+    ephemeral: true
+  })
+)
