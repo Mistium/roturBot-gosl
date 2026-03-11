@@ -33,21 +33,6 @@ def messageHandler(*Connection c, string message) (
       // log "User disconnected: " ++ (json.username ?? "unknown")
     case "message_new"
       message_new(c, json, config.token.toStr())
-      if json.message != null and typeof(json.message) == "object" (
-        object msg_obj = json.message.assert(object)
-        if msg_obj.interaction != null and typeof(msg_obj.interaction) == "object" (
-          object inter = msg_obj.interaction.assert(object)
-          string react_key = inter.command.toStr() ++ ":" ++ inter.username.toStr()
-          if pending_reactions.contains(react_key) (
-            pending_reactions.delete(react_key)
-            string msg_id = msg_obj.id.toStr()
-            string ch = json.channel.toStr()
-            if msg_id != "" (
-              reactToMessage(c, ch, msg_id, "💰")
-            )
-          )
-        )
-      )
     case "slash_call"
       handleSlashCall(c, json)
     case "slash_register"
