@@ -7,13 +7,6 @@ def registerEconomyCommands() (
     ephemeral: true
   })
 
-  registerSlashCommand("daily", daily, {
-    name: "daily",
-    description: "Claim your free daily credits (resets at midnight)",
-    options: [],
-    ephemeral: true
-  })
-
   registerSlashCommand("transfer", transfer, {
     name: "transfer",
     description: "Transfer credits to another user",

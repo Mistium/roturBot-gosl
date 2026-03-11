@@ -57,7 +57,6 @@ import "./slashes/account/standing.osl"
 
 // economy
 import "./slashes/economy/balance.osl"
-import "./slashes/economy/daily.osl"
 import "./slashes/economy/transfer.osl"
 import "./slashes/economy/subscribe.osl"
 import "./slashes/economy/unsubscribe.osl"
