@@ -45,10 +45,17 @@ def transfer(*Connection c, object msg) (
   string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ username ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ msg.user ++ "&note=" ++ note
   object resp = requests.Post(url, ADMIN_HEADERS)
 
-  object body = resp.body.toStr().JsonParse().assert(object)
+  any body = resp.body.toStr().JsonParse()
 
-  if body.error != null (
-    sendResponse(c, msg, body.error.toStr())
+  if typeof(body) != "object" (
+    sendResponse(c, msg, "Error: " ++ body.toStr())
+    return
+  )
+
+  object parsed = body.assert(object)
+
+  if parsed.error != null (
+    sendResponse(c, msg, parsed.error.toStr())
     return
   )
 

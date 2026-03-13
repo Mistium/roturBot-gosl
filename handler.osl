@@ -110,9 +110,6 @@ def registerAllSlashCommands(*Connection c) (
   })
 )
 
-// handleSlashCall dispatches an incoming slash_call event from the server.
-// The server has already validated args, roles, etc. — we just need to route
-// the call to the correct handler with a normalised msg object.
 def handleSlashCall(*Connection c, object json) (
   any val_raw = json.val
   if typeof(val_raw) != "object" (
@@ -128,9 +125,6 @@ def handleSlashCall(*Connection c, object json) (
     return
   )
 
-  // Build a msg object that matches what legacy text handlers expect,
-  // with args available at msg.args for handlers that want structured access.
-  // command and invoker are set so sendResponse knows to use slash_response.
   object msg = {
     user: json.invokerUsername ?? json.invoker,
     channel: json.channel,
