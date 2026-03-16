@@ -10,6 +10,11 @@ def message_new(*Connection c, object json, string token) (
 
   string server_url = c.Get("serverUrl").toStr()
 
+  object counting_msg = rawToMsg(json)
+  if handleCountingMessage(c, counting_msg, server_url) (
+    return
+  )
+
   if content.contains("@roturBOT") (
     handleAIQuery(c, rawToMsg(json), server_url)
     return
@@ -39,9 +44,9 @@ def message_new(*Connection c, object json, string token) (
     )
 
     string new_content = content.trim(prefixes[i].len + 1, -1).strip()
-    object msg = rawToMsg(json)
-    msg.content = new_content
-    commands[prefixes[i]](c, msg)
+    object cmd_msg = rawToMsg(json)
+    cmd_msg.content = new_content
+    commands[prefixes[i]](c, cmd_msg)
     command_found = true
   )
 

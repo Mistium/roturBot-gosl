@@ -1,0 +1,321 @@
+def _ensureCountingStateLoaded() (
+  if _counting_state_loaded (
+    return
+  )
+  if fs.Exists(COUNTING_STATE_FILE) (
+    any data = fs.ReadFile(COUNTING_STATE_FILE).JsonParse()
+    if typeof(data) == "object" (
+      _counting_state = data.assert(object)
+    )
+  )
+  _counting_state_loaded = true
+)
+
+def _saveCountingState() (
+  fs.Mkdir("store")
+  fs.WriteFile(COUNTING_STATE_FILE, _counting_state.JsonStringify())
+)
+
+def _makeDefaultChannelState() object (
+  return {
+    current_count: 0,
+    last_user: null,
+    total_counts: 0,
+    highest_count: 0,
+    resets: 0,
+    last_count_message_id: null,
+    last_count_value: null,
+    users: {}
+  }
+)
+
+def getChannelState(string channel_id) object (
+  _ensureCountingStateLoaded()
+  if !_counting_state.contains(channel_id) (
+    _counting_state[channel_id] = _makeDefaultChannelState()
+  )
+  object state = _counting_state[channel_id].assert(object)
+  object defaults = _makeDefaultChannelState()
+  array keys = defaults.getKeys()
+  for i keys.len (
+    string key = keys[i].toStr()
+    if !state.contains(key) (
+      state[key] = defaults[key]
+    )
+  )
+  return state
+)
+
+def _getOrCreateUser(object state, string user_id) object (
+  object users = state.users.assert(object)
+  if !users.contains(user_id) (
+    users[user_id] = {
+      counts: 0,
+      fails: 0,
+      wrong_attempts: 0,
+      last_seen: timestamp.toInt()
+    }
+  ) else (
+    object u = users[user_id].assert(object)
+    if !u.contains("counts") (
+      u.counts = 0
+    )
+    if !u.contains("fails") (
+      u.fails = 0
+    )
+    if !u.contains("wrong_attempts") (
+      u.wrong_attempts = 0
+    )
+    u.last_seen = timestamp.toInt()
+  )
+  return users[user_id].assert(object)
+)
+
+def extractNumberFromMessage(string content) any (
+  string trimmed = content.strip()
+  
+  if trimmed.len == 0 (
+    return null
+  )
+  
+  return trimmed.toNum()
+)
+
+def handleCountingMessage(*Connection c, object msg, string server_url) bool (
+  if server_url != COUNTING_SERVER (
+    return false
+  )
+  
+  string channel = msg.channel.toStr()
+  
+  if channel.toLower() != COUNTING_CHANNEL_NAME (
+    return false
+  )
+  
+  string content = msg.content.toStr().strip()
+  string user_id = msg.user.toStr()
+  string username = msg.user.toStr()
+  
+  object state = getChannelState(channel)
+  
+  if content.startsWith("!set_count") (
+    if user_id != "Mist" (
+      sendResponse(c, msg, "Only admins can use this command!")
+      return true
+    )
+    array parts = content.split(" ")
+    if parts.len < 2 (
+      sendResponse(c, msg, "Usage: `!set_count <number>`")
+      return true
+    )
+    number new_count = parts[2].toNum()
+    state.current_count = new_count
+    state.last_user = null
+    state.last_count_message_id = null
+    state.last_count_value = null
+    _saveCountingState()
+    sendResponse(c, msg, "Count set to **" ++ new_count.toInt().toStr() ++ "**. Next number is **" ++ (new_count + 1).toInt().toStr() ++ "**!")
+    return true
+  )
+  
+  bool is_boost = content.startsWith("!boost")
+  
+  any number_raw = extractNumberFromMessage(content)
+
+  if number_raw == 0 (
+    return true
+  )
+  
+  if number_raw == null and !is_boost (
+    return true
+  )
+  
+  if username == "" (
+    sendResponse(c, msg, "You need a rotur account to participate in counting! Link your account with /link")
+    return true
+  )
+  
+  if is_boost (
+    array parts = content.split(" ")
+    if parts.len < 2 (
+      sendResponse(c, msg, "Usage: `!boost <number>`")
+      return true
+    )
+    number boost_by = parts[2].toNum()
+    if boost_by < 1 (
+      sendResponse(c, msg, "Number must be greater than 0")
+      return true
+    )
+    
+    object resp = transferCredits(username, "rotur", boost_by, "Counting Boost")
+    if resp.error != null (
+      sendResponse(c, msg, "Error boosting: " ++ resp.error.toStr())
+      return true
+    )
+    
+    number add_to = boost_by * 10
+    state.current_count = state.current_count.toNum() + add_to
+    _saveCountingState()
+    sendResponse(c, msg, "Boosted count by " ++ add_to.toInt().toStr() ++ " using " ++ boost_by.toInt().toStr() ++ " credits, the next number is **" ++ (state.current_count.toNum() + 1).toInt().toStr() ++ "**!")
+    return true
+  )
+  
+  if number_raw == null (
+    return true
+  )
+  
+  number number = number_raw.toNum()
+  number expected = state.current_count.toNum() + 1
+  object user_stats = _getOrCreateUser(state, user_id)
+  
+  if number == expected (
+    if state.last_user.toStr() == user_id (
+      sendResponse(c, msg, "You can't count twice in a row! Wait for someone else to count " ++ expected.toInt().toStr() ++ ".")
+      return true
+    )
+    
+    state.current_count = number.toInt()
+    state.last_user = user_id
+    state.last_count_message_id = msg.id.toStr()
+    state.last_count_value = number.toInt()
+    state.total_counts = state.total_counts.toNum() + 1
+    user_stats.counts = user_stats.counts.toNum() + 1
+    
+    if state.current_count.toNum() > state.highest_count.toNum() (
+      state.highest_count = state.current_count
+    )
+    
+    _saveCountingState()
+    
+    number current = state.current_count.toNum()
+    if current % 100 == 0 (
+      reactToMessage(c, channel, msg.id.toStr(), "💯")
+    ) else if current % 50 == 0 (
+      reactToMessage(c, channel, msg.id.toStr(), "🎉")
+    ) else if current % 10 == 0 (
+      reactToMessage(c, channel, msg.id.toStr(), "✨")
+    ) else (
+      reactToMessage(c, channel, msg.id.toStr(), "✅")
+    )
+    
+    return true
+  ) else (
+    if state.last_user.toStr() != user_id (
+      number old_count = state.current_count.toNum()
+      state.current_count = 0
+      state.last_user = null
+      state.last_count_message_id = null
+      state.last_count_value = null
+      state.resets = state.resets.toNum() + 1
+      user_stats.fails = user_stats.fails.toNum() + 1
+      _saveCountingState()
+      
+      sendResponse(c, msg, "**Count reset!** " ++ username ++ " ruined it at " ++ old_count.toInt().toStr() ++ "! The next number was **" ++ expected.toInt().toStr() ++ "** but they said **" ++ number.toInt().toStr() ++ "**.\nHighest count reached: **" ++ state.highest_count.toNum().toInt().toStr() ++ "**\nStart again from **1**!")
+      return true
+    ) else (
+      user_stats.wrong_attempts = user_stats.wrong_attempts.toNum() + 1
+      _saveCountingState()
+      sendResponse(c, msg, username ++ " wrong number! The next count should be **" ++ expected.toInt().toStr() ++ "**, not **" ++ number.toInt().toStr() ++ "**.")
+      return true
+    )
+  )
+  
+  return false
+)
+
+def getLeaderboards(string channel_id, int top_n) object (
+  object state = getChannelState(channel_id)
+  object users = state.users.assert(object)
+  
+  array user_list = []
+  array user_keys = users.getKeys()
+  for i user_keys.len (
+    string uid = user_keys[i].toStr()
+    object u = users[uid].assert(object)
+    user_list.append({ user_id: uid, counts: u.counts.toNum(), fails: u.fails.toNum(), wrong_attempts: u.wrong_attempts.toNum() })
+  )
+  
+  array top_counts = []
+  for i user_list.len (
+    object entry = user_list[i].assert(object)
+    number c = entry.counts.toNum()
+    int pos = 0
+    for j top_counts.len (
+      object existing = top_counts[j].assert(object)
+      if c > existing.counts.toNum() (
+        break
+      )
+      pos = pos + 1
+    )
+    if pos < top_n (
+      array before = []
+      array after = []
+      for k top_counts.len (
+        if k < pos (
+          before.append(top_counts[k])
+        ) else (
+          after.append(top_counts[k])
+        )
+      )
+      top_counts = before
+      top_counts.append(entry)
+      for k after.len (
+        if top_counts.len < top_n (
+          top_counts.append(after[k])
+        )
+      )
+    )
+  )
+  
+  array top_fails = []
+  for i user_list.len (
+    object entry = user_list[i].assert(object)
+    number f = entry.fails.toNum()
+    int pos = 0
+    for j top_fails.len (
+      object existing = top_fails[j].assert(object)
+      if f > existing.fails.toNum() (
+        break
+      )
+      pos = pos + 1
+    )
+    if pos < top_n (
+      array before = []
+      array after = []
+      for k top_fails.len (
+        if k < pos (
+          before.append(top_fails[k])
+        ) else (
+          after.append(top_fails[k])
+        )
+      )
+      top_fails = before
+      top_fails.append(entry)
+      for k after.len (
+        if top_fails.len < top_n (
+          top_fails.append(after[k])
+        )
+      )
+    )
+  )
+  
+  return { top_counters: top_counts, top_failers: top_fails }
+)
+
+def getCountingStats(string channel_id) object (
+  object state = getChannelState(channel_id)
+  object leaders = getLeaderboards(channel_id, 5)
+  object users = state.users.assert(object)
+  array user_keys = users.getKeys()
+  
+  return {
+    current_count: state.current_count.toNum(),
+    highest_count: state.highest_count.toNum(),
+    total_counts: state.total_counts.toNum(),
+    next_number: state.current_count.toNum() + 1,
+    unique_counters: user_keys.len,
+    resets: state.resets.toNum(),
+    top_counters: leaders.top_counters,
+    top_failers: leaders.top_failers
+  }
+)

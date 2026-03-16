@@ -1,0 +1,19 @@
+def reset_counting(*Connection c, object msg) (
+  string invoker = msg.user.toStr()
+
+  if invoker != "Mist" (
+    sendResponse(c, msg, "Only administrators can reset the counting!")
+    return
+  )
+
+  object state = getChannelState(COUNTING_CHANNEL_NAME)
+  number old_count = state.current_count.toNum()
+  state.current_count = 0
+  state.last_user = null
+  state.last_count_message_id = null
+  state.last_count_value = null
+  _saveCountingState()
+
+  string description = "The counting has been reset!\nPrevious count: **" ++ old_count.toInt().toStr() ++ "**\nStart counting from **1**!"
+  sendResponse(c, msg, description)
+)

@@ -1,0 +1,11 @@
+def registerCountingCommands() (
+  registerSlashCommand("counting", counting_stats, {
+    name: "counting",
+    description: "Get counting statistics for the counting channel"
+  })
+
+  registerSlashCommand("reset_counting", reset_counting, {
+    name: "reset_counting",
+    description: "Reset the counting (Admin only)"
+  })
+)

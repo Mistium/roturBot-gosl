@@ -29,6 +29,13 @@ object ADMIN_HEADERS = {
   "Content-Type": "application/json",
 }
 
+// Counting system globals
+string COUNTING_SERVER = "wss://chats.mistium.com"
+string COUNTING_CHANNEL_NAME = "counting"
+string COUNTING_STATE_FILE = "store/counting_state.json"
+bool _counting_state_loaded = false
+object _counting_state = {}
+
 import "./ai/ai.osl"
 import "./ai/vercel.osl"
 import "./ai/personalities.osl"
@@ -90,6 +97,11 @@ import "./slashes/friends/requests reject all.osl"
 import "./slashes/stats/totalusers.osl"
 import "./slashes/stats/accorigins.osl"
 
+// counting
+import "./counting.osl"
+import "./slashes/counting/counting.osl"
+import "./slashes/counting/reset.osl"
+
 // misc
 import "./slashes/misc/personality.osl"
 import "./slashes/misc/tod.osl"
@@ -102,6 +114,7 @@ import "./slashes/register_social.osl"
 import "./slashes/register_friends.osl"
 import "./slashes/register_stats.osl"
 import "./slashes/register_misc.osl"
+import "./slashes/register_counting.osl"
 
 import "./handlers/message_new.osl"
 import "./personality_store.osl"
@@ -120,6 +133,7 @@ mainloop:
   registerFriendsCommands()
   registerStatsCommands()
   registerMiscCommands()
+  registerCountingCommands()
 
   for i servers.len (
     connect_url = servers[i].toStr()

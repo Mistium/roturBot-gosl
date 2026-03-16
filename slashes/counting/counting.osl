@@ -1,0 +1,22 @@
+def counting_stats(*Connection c, object msg) (
+  object stats = getCountingStats(COUNTING_CHANNEL_NAME)
+
+  string description = "**Current Count:** " ++ stats.current_count.toInt().toStr() ++ "\n"
+  description = description ++ "**Next Number:** " ++ stats.next_number.toInt().toStr() ++ "\n"
+  description = description ++ "**Highest Count:** " ++ stats.highest_count.toInt().toStr() ++ "\n"
+  description = description ++ "**Total Counts:** " ++ stats.total_counts.toInt().toStr() ++ "\n"
+  description = description ++ "**Unique Counters:** " ++ stats.unique_counters.toInt().toStr() ++ "\n"
+  description = description ++ "**Resets:** " ++ stats.resets.toInt().toStr()
+
+  array top_counters = stats.top_counters.assert(array)
+  if top_counters.len > 0 (
+    description = description ++ "\n\n**Top Counters:**\n"
+    for i top_counters.len (
+      object entry = top_counters[i].assert(object)
+      string display_name = entry.user_id.toStr()
+      description = description ++ (i + 1).toStr() ++ ". " ++ display_name ++ " — " ++ entry.counts.toNum().toInt().toStr() ++ " counts\n"
+    )
+  )
+
+  sendResponse(c, msg, description)
+)

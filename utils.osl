@@ -26,6 +26,7 @@ def rawToMsg(object raw) object (
     user: raw.user ?? msg.user,
     content: raw.content ?? msg.content,
     channel: raw.channel,
+    display_name: raw.display_name ?? raw.channel,
     id: raw.id ?? msg.id
   }
 )
