@@ -25,13 +25,28 @@ def getDefaultPersonality() string (
 )
 
 def getUserPersonality(string user_id) string (
-  return (user_personalities[user_id] ?? "roturbot").toStr()
+  return getUserPersonalityName(user_id)
+)
+
+def setUserPersonality(string user_id, string personality_name) object (
+  if personality_name.len == 0 (
+    return { error: "personality_name is required" }
+  )
+  
+  object personalities = _loadUserPersonalities()
+  personalities[user_id] = personality_name
+  _saveUserPersonalities(personalities)
+  
+  user_personalities[user_id] = personality_name
+  
+  return { success: true, user_id: user_id, personality: personality_name }
 )
 
 def listPersonalities() array (
   return [
     "roturbot",
     "butler",
+    "cardinal",
     "detective",
     "goth",
     "madscientist",

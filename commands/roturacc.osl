@@ -36,25 +36,50 @@ def roturacc(*Connection c, object msg) (
       ]
       sendResponse(c, msg, lines.join("\n"))
     case "get"
-      object data = getUserData(msg.user)
+      string username = spl[1].toStr()
+      object data = getUserData(username)
       if data.error != null (
         sendResponse(c, msg, data.error.toStr())
         return
       )
       sendResponse(c, msg, data.toStr())
     case "size"
-      object data = getUserData(msg.user)
+      string username = spl[1].toStr()
+      object data = getUserData(username)
+      if data.error != null (
+        sendResponse(c, msg, data.error.toStr())
+        return
+      )
       if !data.contains("used_size") (
         sendResponse(c, msg, "Size: unknown")
         return
       )
       sendResponse(c, msg, "Size: " ++ data.used_size.toStr())
     case "token"
-      object data = getUserData(msg.user)
+      string username = spl[1].toStr()
+      object data = getUserData(username)
       if data.error != null (
         sendResponse(c, msg, data.error.toStr())
         return
       )
       sendResponse(c, msg, "Token: " ++ data.key.toStr())
+    case "sub"
+      if spl.len < 4 (
+        sendResponse(c, msg, "Usage: !roturacc <username> sub <tier>")
+        return
+      )
+      string username = spl[1].toStr()
+      string tier = spl[3].toStr()
+      object data = getUserData(username)
+      if data.error != null (
+        sendResponse(c, msg, data.error.toStr())
+        return
+      )
+      object resp = addSubscription(username, tier)
+      if resp.error != null (
+        sendResponse(c, msg, resp.error.toStr())
+        return
+      )
+      sendResponse(c, msg, "Added subscription " ++ tier ++ " to " ++ username ++ " for 31 days")
   )
 )

@@ -1,12 +1,12 @@
 // Memory System for roturbot-gosl
-// Provides per-channel persistent memory stored as JSON files in ./store/memories/
+// Provides per-server persistent memory stored as JSON files in ./store/memories/
 
-def _getMemoryFile(string channel_id) string (
-  return "./store/memories/" ++ channel_id ++ ".json"
+def _getMemoryFile(string server_id) string (
+  return "./store/memories/" ++ server_id ++ ".json"
 )
 
-def _loadMemories(string channel_id) array (
-  string path = _getMemoryFile(channel_id)
+def _loadMemories(string server_id) array (
+  string path = _getMemoryFile(server_id)
   string data = fs.ReadFile(path)
   if data.len == 0 (
     return []
@@ -23,13 +23,13 @@ def _loadMemories(string channel_id) array (
   return mems.assert(array)
 )
 
-def _saveMemories(string channel_id, array memories) (
-  string path = _getMemoryFile(channel_id)
+def _saveMemories(string server_id, array memories) (
+  string path = _getMemoryFile(server_id)
   object data = { memories: memories }
   fs.WriteFile(path, data.toStr())
 )
 
-def saveMemory(string channel_id, string content, array tags, number importance, number ttl_days) object (
+def saveMemory(string server_id, string content, array tags, number importance, number ttl_days) object (
   if content.len == 0 (
     return { error: "content is required" }
   )
@@ -44,7 +44,7 @@ def saveMemory(string channel_id, string content, array tags, number importance,
     ttl_days = 30
   )
 
-  array memories = _loadMemories(channel_id)
+  array memories = _loadMemories(server_id)
 
   number expires_at = timestamp + (ttl_days * 86400000)
 
@@ -61,23 +61,27 @@ def saveMemory(string channel_id, string content, array tags, number importance,
   }
 
   memories.append(memory)
-  _saveMemories(channel_id, memories)
+  _saveMemories(server_id, memories)
 
   return { success: true, id: mem_id, content: content, tags: tags, importance: importance, expires_at: expires_at }
 )
 
-def searchMemories(string channel_id, string query, array tags_filter, number min_importance, number limit) array (
+def searchMemories(string server_id, string query, array tags_filter, number min_importance, number limit) array (
   if limit < 1 (
     limit = 5
   )
 
-  array memories = _loadMemories(channel_id)
+  array memories = _loadMemories(server_id)
   number now = timestamp
 
   // Filter out expired and low-importance memories
   array active = []
   for i memories.len (
-    object mem = memories[i].assert(object)
+    any mem_raw = memories[i]
+    if mem_raw == null or typeof(mem_raw) != "object" (
+      continue
+    )
+    object mem = mem_raw.assert(object)
     number exp = (mem.expires_at ?? 0).toNum()
     if exp > 0 and exp < now (
       continue
@@ -118,7 +122,11 @@ def searchMemories(string channel_id, string query, array tags_filter, number mi
 
   array scored = []
   for i active.len (
-    object mem = active[i].assert(object)
+    any mem_raw = active[i]
+    if mem_raw == null or typeof(mem_raw) != "object" (
+      continue
+    )
+    object mem = mem_raw.assert(object)
     string content_lower = mem.content.toStr().toLower()
     number score = 0
     for j query_words.len (
@@ -136,8 +144,13 @@ def searchMemories(string channel_id, string query, array tags_filter, number mi
       if j < 1 (
         continue
       )
-      object a = scored[j - 1].assert(object)
-      object b = scored[j].assert(object)
+      any a_raw = scored[j - 1]
+      any b_raw = scored[j]
+      if a_raw == null or b_raw == null (
+        continue
+      )
+      object a = a_raw.assert(object)
+      object b = b_raw.assert(object)
       if a.score.toNum() < b.score.toNum() (
         scored[j - 1] = b
         scored[j] = a
@@ -151,19 +164,27 @@ def searchMemories(string channel_id, string query, array tags_filter, number mi
     take = scored.len.toNum()
   )
   for i take (
-    object entry = scored[i].assert(object)
+    any entry_raw = scored[i]
+    if entry_raw == null or typeof(entry_raw) != "object" (
+      continue
+    )
+    object entry = entry_raw.assert(object)
     results.append(entry.mem)
   )
 
   return results
 )
 
-def updateMemory(string channel_id, string memory_id, string action, number new_ttl_days, number importance_boost) object (
-  array memories = _loadMemories(channel_id)
+def updateMemory(string server_id, string memory_id, string action, number new_ttl_days, number importance_boost) object (
+  array memories = _loadMemories(server_id)
 
   number found_idx = -1
   for i memories.len (
-    object mem = memories[i].assert(object)
+    any mem_raw = memories[i]
+    if mem_raw == null or typeof(mem_raw) != "object" (
+      continue
+    )
+    object mem = mem_raw.assert(object)
     if mem.id.toStr() == memory_id (
       found_idx = i.toNum()
     )
@@ -180,11 +201,15 @@ def updateMemory(string channel_id, string memory_id, string action, number new_
         new_mems.append(memories[i])
       )
     )
-    _saveMemories(channel_id, new_mems)
+    _saveMemories(server_id, new_mems)
     return { success: true, action: "deleted" }
   )
 
-  object mem = memories[found_idx].assert(object)
+  any mem_raw = memories[found_idx]
+  if mem_raw == null or typeof(mem_raw) != "object" (
+    return { error: "Memory not found" }
+  )
+  object mem = mem_raw.assert(object)
 
   if action == "extend" (
     if new_ttl_days < 1 (
@@ -206,6 +231,6 @@ def updateMemory(string channel_id, string memory_id, string action, number new_
     return { error: "Unknown action: " ++ action }
   )
 
-  _saveMemories(channel_id, memories)
+  _saveMemories(server_id, memories)
   return { success: true, memory: mem }
 )

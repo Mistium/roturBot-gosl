@@ -2,13 +2,36 @@ def message_new(*Connection c, object json, string token) (
   object msg = json.message
   string content = msg.content
 
-  addMessageToCache(json.channel.toStr(), msg)
-
-  if content.contains("@roturBOT") (
-  handleAIQuery(c, rawToMsg(json))
-  return
+  if msg.user.toStr() == "roturbot" (
+    return
   )
 
+  addMessageToCache(json.channel.toStr(), msg)
+
+  string server_url = c.Get("serverUrl").toStr()
+
+  if content.contains("@roturBOT") (
+    handleAIQuery(c, rawToMsg(json), server_url)
+    return
+  )
+
+  any pings_raw = msg.pings
+  if typeof(pings_raw) == "object" (
+    object pings = pings_raw.assert(object)
+    any replies_raw = pings.replies
+    if typeof(replies_raw) == "array" (
+      array replies = replies_raw.assert(array)
+      for i replies.len (
+        string reply_text = replies[i].toStr()
+        if reply_text.toLower().contains("roturbot") (
+          handleAIQuery(c, rawToMsg(json), server_url)
+          return
+        )
+      )
+    )
+  )
+
+  bool command_found = false
   array prefixes = commands.getKeys()
   for i prefixes.len (
     if !content.startsWith(prefixes[i].toStr()) (
@@ -19,5 +42,11 @@ def message_new(*Connection c, object json, string token) (
     object msg = rawToMsg(json)
     msg.content = new_content
     commands[prefixes[i]](c, msg)
+    command_found = true
+  )
+
+  // Handle DMs with AI if no command was found
+  if !command_found and server_url == "wss://dms.mistium.com" (
+    handleAIQuery(c, rawToMsg(json), server_url)
   )
 )

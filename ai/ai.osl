@@ -1,4 +1,4 @@
-def handleAIQuery(*Connection c, object msg) (
+def handleAIQuery(*Connection c, object msg, string server_url) (
   object user_data = validateUser(msg.user.toStr())
 
   if user_data.error != null (
@@ -13,14 +13,28 @@ def handleAIQuery(*Connection c, object msg) (
     return
   )
 
-  object reply_msg = sendReply(c, msg, "waiting for ai...")
+  string channel_id = msg.channel.toStr()
+
+  // For DMs, send standalone message instead of reply
+  bool is_dm = server_url == "wss://dms.mistium.com"
+  object reply_msg = {}
+  if is_dm (
+    reply_msg = sendMessage(c, channel_id, "waiting for ai...")
+  ) else (
+    reply_msg = sendReply(c, msg, "waiting for ai...")
+  )
 
   string personality_name = getUserPersonality(msg.user.toStr())
   string personality = getPersonalityPrompt(personality_name)
 
-  array messages = buildAIMessages(user_data.user.assert(object), msg.content.toStr(), personality, msg.channel.toStr())
+  string content = msg.content.toStr()
+  if content.toLower().startsWith("@roturbot") (
+    content = content.trim("@roturbot".len + 1, -1).strip()
+  )
 
-  object response = queryAIWithTools(c, reply_msg, messages, tier, 0)
+  array messages = buildAIMessages(user_data.user.assert(object), content, personality, channel_id, c, server_url)
+
+  object response = queryAIWithTools(c, channel_id, messages, tier, 0, server_url)
 
   if response.error != null (
     editMessage(c, reply_msg, "Sorry, I encountered an error: " ++ response.error.toStr())
@@ -52,7 +66,75 @@ def validateUser(string discord_id) object (
   }
 )
 
-def buildAIMessages(object user, string prompt, string personality, string channel_id) array (
+def fetchChannelHistory(*Connection c, string channel_id, number limit) string (
+  string listener = randomString(20)
+  c.Send({
+    cmd: "messages_get",
+    channel: channel_id,
+    limit: limit,
+    listener: listener
+  })
+  
+  while !recent_listened_messages.contains(listener) (
+    wait 0.1
+  )
+  
+  object data = recent_listened_messages[listener].assert(object)
+  recent_listened_messages.delete(listener)
+  
+  any messages_raw = data.messages
+  if typeof(messages_raw) != "array" (
+    return ""
+  )
+  
+  array messages = messages_raw.assert(array)
+  
+  if messages.len == 0 (
+    return ""
+  )
+  
+  string history = ""
+  
+  for i messages.len (
+    any msg_raw = messages[i]
+    if msg_raw == null or typeof(msg_raw) != "object" (
+      continue
+    )
+    
+    object msg = msg_raw.assert(object)
+    string username = (msg.user ?? "unknown").toStr()
+    string content = (msg.content ?? "").toStr()
+    
+    any reply_to_raw = msg.reply_to
+    string reply_suffix = ""
+    if reply_to_raw != null and typeof(reply_to_raw) == "object" (
+      object reply_to = reply_to_raw.assert(object)
+      string reply_user = (reply_to.user ?? "unknown").toStr()
+      
+      if messages.len.toNum() > 1 (
+        for j messages.len (
+          if i == j (
+            continue
+          )
+          any prev_raw = messages[j]
+          if prev_raw == null or typeof(prev_raw) != "object" (
+            continue
+          )
+          object prev = prev_raw.assert(object)
+          if (prev.id ?? "").toStr() == (reply_to.id ?? "").toStr() (
+            reply_suffix = " (in reply to " ++ reply_user ++ " saying \"" ++ (prev.content ?? "unknown").toStr() ++ "\")"
+          )
+        )
+      )
+    )
+    
+    history += username ++ " said \"" ++ content ++ "\"" ++ reply_suffix ++ "\n"
+  )
+  
+  return history
+)
+
+def buildAIMessages(object user, string prompt, string personality, string channel_id, *Connection c, string server_url) array (
   array messages = []
 
   messages.append({
@@ -96,14 +178,18 @@ def buildAIMessages(object user, string prompt, string personality, string chann
   if username.len > 0 (
     tags_filter.append("user:" ++ username)
   )
-  array user_memories = searchMemories(channel_id, "user:" ++ username, tags_filter, 1, 5)
-  array general_memories = searchMemories(channel_id, prompt, [], 7, 8)
+  array user_memories = searchMemories(server_url, "user:" ++ username, tags_filter, 1, 5)
+  array general_memories = searchMemories(server_url, prompt, [], 7, 8)
 
   // Combine without duplicates
   array all_memories = []
   object seen_mem_ids = {}
   for i user_memories.len (
-    object mem = user_memories[i].assert(object)
+    any mem_raw = user_memories[i]
+    if mem_raw == null or typeof(mem_raw) != "object" (
+      continue
+    )
+    object mem = mem_raw.assert(object)
     string mid = (mem.id ?? "").toStr()
     if !seen_mem_ids.contains(mid) (
       seen_mem_ids[mid] = true
@@ -111,7 +197,11 @@ def buildAIMessages(object user, string prompt, string personality, string chann
     )
   )
   for i general_memories.len (
-    object mem = general_memories[i].assert(object)
+    any mem_raw = general_memories[i]
+    if mem_raw == null or typeof(mem_raw) != "object" (
+      continue
+    )
+    object mem = mem_raw.assert(object)
     string mid = (mem.id ?? "").toStr()
     if !seen_mem_ids.contains(mid) (
       seen_mem_ids[mid] = true
@@ -122,7 +212,11 @@ def buildAIMessages(object user, string prompt, string personality, string chann
   if all_memories.len > 0 (
     string memory_text = "RELEVANT MEMORIES:\n"
     for i all_memories.len (
-      object mem = all_memories[i].assert(object)
+      any mem_raw = all_memories[i]
+      if mem_raw == null or typeof(mem_raw) != "object" (
+        continue
+      )
+      object mem = mem_raw.assert(object)
       memory_text ++= "- " ++ mem.content.toStr() ++ "\n"
     )
     messages.append({
@@ -131,11 +225,11 @@ def buildAIMessages(object user, string prompt, string personality, string chann
     })
   )
 
-  string history = getMessageHistory(channel_id)
+  string history = fetchChannelHistory(c, channel_id, 30)
   if history.len > 0 (
     messages.append({
       role: "system",
-      content: "RECENT CHANNEL CONTEXT (last 40 messages):\n\n" ++ history
+      content: "RECENT CHANNEL CONTEXT (last 30 messages):\n\n" ++ history
     })
   )
 
@@ -147,22 +241,39 @@ def buildAIMessages(object user, string prompt, string personality, string chann
   return messages
 )
 
-def queryAIWithTools(*Connection c, object reply_msg, array messages, string tier, number depth) object (
-  if depth > 10 (
-    return { error: "Too many tool calls" }
-  )
-
+def queryAIWithTools(*Connection c, string channel_id, array messages, string tier, number depth, string server_url) object (
   array ai_tools = openArrayFile("./ai/tools.json")
   object response = queryAI(messages, tier, true, ai_tools)
 
-  object choice = response.choices[1].assert(object)
-  object message = (choice.message ?? {}).assert(object)
+  if response.error != null (
+    return response
+  )
 
-  // log message
+  if !response.contains("choices") or response.choices == null or response.choices.len == 0 (
+    return { error: "No choices in response" }
+  )
+
+  any choice_raw = response.choices[1]
+  if choice_raw == null or typeof(choice_raw) != "object" (
+    return { error: "Invalid choice format" }
+  )
+
+  object choice = choice_raw.assert(object)
+  any message_raw = choice.message
+
+  if message_raw == null or typeof(message_raw) != "object" (
+    return { error: "Invalid message format" }
+  )
+
+  object message = message_raw.assert(object)
+  string content = message.content ?? ""
 
   if message.tool_calls != null and message.tool_calls.len > 0 (
-    array tool_calls = message.tool_calls.assert(array)
-    string content = message.content ?? ""
+    any tool_calls_raw = message.tool_calls
+    if typeof(tool_calls_raw) != "array" (
+      return { error: "Invalid tool_calls format" }
+    )
+    array tool_calls = tool_calls_raw.assert(array)
 
     object assistant_msg = {
       role: "assistant",
@@ -172,9 +283,19 @@ def queryAIWithTools(*Connection c, object reply_msg, array messages, string tie
     messages.append(assistant_msg)
 
     for i tool_calls.len (
-      object tc = tool_calls[i].assert(object)
+      any tc_raw = tool_calls[i]
+      if tc_raw == null or typeof(tc_raw) != "object" (
+        continue
+      )
+      object tc = tc_raw.assert(object)
       string tc_id = tc.id ?? ""
-      object func_data = (tc.function ?? {}).assert(object)
+
+      any func_raw = tc.function
+      if func_raw == null or typeof(func_raw) != "object" (
+        continue
+      )
+      object func_data = func_raw.assert(object)
+
       string func_name = func_data.name ?? ""
       string args_raw = func_data.arguments ?? "{}"
 
@@ -184,13 +305,8 @@ def queryAIWithTools(*Connection c, object reply_msg, array messages, string tie
         args = args_parsed.assert(object)
       )
 
-      string tool_display = formatToolDisplay(func_name, args)
+      string tool_result = callTool(c, func_name, args, channel_id, server_url)
 
-      editMessage(c, reply_msg, tool_display)
-
-      string tool_result = callTool(func_name, args, reply_msg.channel.toStr())
-
-      // Handle silent_exit
       if tool_result == "__SILENT_EXIT__" (
         return { choices: [{ message: { content: "" }, finish_reason: "silent_exit" }] }
       )
@@ -203,7 +319,7 @@ def queryAIWithTools(*Connection c, object reply_msg, array messages, string tie
       messages.append(tool_msg)
     )
 
-    return queryAIWithTools(c, reply_msg, messages, tier, depth + 1)
+    return queryAIWithTools(c, channel_id, messages, tier, depth + 1, server_url)
   )
 
   return response
@@ -244,18 +360,20 @@ def formatToolDisplay(string func_name, object args) string (
     display = "updating relationship thoughts..."
   ) else if func_name == "modify_emotional_state" and args.contains("action") (
     display = "updating emotional state (" ++ args.action.toStr() ++ ")..."
-  ) else if func_name == "calculate" and args.contains("expression") (
-    display = "calculating: " ++ args.expression.toStr()
-  ) else if func_name == "silent_exit" (
-    display = "silent exit..."
-  ) else if func_name == "make_web_request" and args.contains("url") (
-    display = "requesting: " ++ args.url.toStr()
-  )
+    ) else if func_name == "calculate" and args.contains("expression") (
+      display = "calculating: " ++ args.expression.toStr()
+    ) else if func_name == "search_messages" and args.contains("query") (
+      display = "searching messages: \"" ++ args.query.toStr() ++ "\""
+    ) else if func_name == "silent_exit" (
+      display = "silent exit..."
+    ) else if func_name == "make_web_request" and args.contains("url") (
+      display = "requesting: " ++ args.url.toStr()
+    )
 
   return "Calling " ++ display
 )
 
-def callTool(string name, object args, string channel_id) string (
+def callTool(*Connection c, string name, object args, string channel_id, string server_url) string (
   switch name (
     case "describe_image"
       string image_url = (args.image_url ?? "").toStr()
@@ -387,11 +505,7 @@ def callTool(string name, object args, string channel_id) string (
       )
       number mem_importance = (args.importance ?? 5).toNum()
       number mem_ttl = (args.ttl_days ?? 30).toNum()
-      string mem_channel = channel_id
-      if args.contains("channel_id") (
-        mem_channel = args.channel_id.toStr()
-      )
-      object save_result = saveMemory(mem_channel, mem_content, mem_tags, mem_importance, mem_ttl)
+      object save_result = saveMemory(server_url, mem_content, mem_tags, mem_importance, mem_ttl)
       return save_result.toStr()
 
     case "search_memories"
@@ -403,11 +517,7 @@ def callTool(string name, object args, string channel_id) string (
       )
       number search_min_imp = (args.min_importance ?? 1).toNum()
       number search_limit = (args.limit ?? 5).toNum()
-      string search_channel = channel_id
-      if args.contains("channel_id") (
-        search_channel = args.channel_id.toStr()
-      )
-      array search_results = searchMemories(search_channel, search_query, search_tags, search_min_imp, search_limit)
+      array search_results = searchMemories(server_url, search_query, search_tags, search_min_imp, search_limit)
       return search_results.toStr()
 
     case "update_memory"
@@ -415,11 +525,7 @@ def callTool(string name, object args, string channel_id) string (
       string update_action = (args.action ?? "").toStr()
       number update_ttl = (args.new_ttl_days ?? 30).toNum()
       number update_boost = (args.importance_boost ?? 1).toNum()
-      string update_channel = channel_id
-      if args.contains("channel_id") (
-        update_channel = args.channel_id.toStr()
-      )
-      object update_result = updateMemory(update_channel, update_id, update_action, update_ttl, update_boost)
+      object update_result = updateMemory(server_url, update_id, update_action, update_ttl, update_boost)
       return update_result.toStr()
 
     case "modify_relationship"
@@ -445,6 +551,53 @@ def callTool(string name, object args, string channel_id) string (
       // OSL does not have a math evaluator; return a note for the AI to compute
       return { note: "OSL does not support dynamic math evaluation. Expression: " ++ expr ++ " - please compute this yourself." }.toStr()
 
+    case "search_messages"
+      string search_query = (args.query ?? "").toStr()
+      if search_query.len == 0 (
+        return { error: "query is required" }.toStr()
+      )
+      
+      string search_listener = randomString(20)
+      c.Send({
+        cmd: "messages_search",
+        channel: channel_id,
+        query: search_query,
+        listener: search_listener
+      })
+      
+      while !recent_listened_messages.contains(search_listener) (
+        wait 0.1
+      )
+      
+      object search_data = recent_listened_messages[search_listener].assert(object)
+      recent_listened_messages.delete(search_listener)
+      
+      any results_raw = search_data.results
+      if typeof(results_raw) != "array" (
+        return { error: "Invalid search results format" }.toStr()
+      )
+      
+      array results = results_raw.assert(array)
+      
+      if results.len == 0 (
+        return { results: [], message: "No messages found matching query: " ++ search_query }.toStr()
+      )
+      
+      string formatted = "Found " ++ results.len.toStr() ++ " message(s) matching \"" ++ search_query ++ "\":\n"
+      for i results.len (
+        any msg_raw = results[i]
+        if msg_raw == null or typeof(msg_raw) != "object" (
+          continue
+        )
+        object msg = msg_raw.assert(object)
+        string username = (msg.user ?? "unknown").toStr()
+        string content = (msg.content ?? "").toStr()
+        number ts = (msg.timestamp ?? 0).toNum()
+        formatted += "- " ++ username ++ " said \"" ++ content ++ "\" (timestamp: " ++ ts.toStr() ++ ")\n"
+      )
+      
+      return { results: results, formatted: formatted }.toStr()
+
     case "silent_exit"
       return "__SILENT_EXIT__"
   )
@@ -453,14 +606,29 @@ def callTool(string name, object args, string channel_id) string (
 )
 
 def processResponse(*Connection c, object reply_msg, object response, string tier) (
-  object first_choice = response.choices[1].assert(object)
+  if !response.contains("choices") or response.choices == null or response.choices.len == 0 (
+    return
+  )
+
+  any first_choice_raw = response.choices[1]
+  if first_choice_raw == null or typeof(first_choice_raw) != "object" (
+    return
+  )
+
+  object first_choice = first_choice_raw.assert(object)
   string finish_reason = (first_choice.finish_reason ?? "").toStr()
 
   if finish_reason == "silent_exit" (
     return
   )
 
-  string content = first_choice.message.content ?? ""
+  any message_raw = first_choice.message
+  if message_raw == null or typeof(message_raw) != "object" (
+    return
+  )
+
+  object message_obj = message_raw.assert(object)
+  string content = message_obj.content ?? ""
 
   if content.len == 0 (
     editMessage(c, reply_msg, "Sorry, I couldn't generate a response to that.")

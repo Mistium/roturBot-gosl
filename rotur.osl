@@ -377,3 +377,22 @@ def adminUpdateUser(update_type, username, key, value) object (
   )
   return parsed.assert(object)
 )
+
+def addSubscription(username, tier) object (
+  object resp = requests.Post("https://api.rotur.dev/admin/set_sub", {
+    "content-type": "application/json",
+    "Authorization": ADMIN_TOKEN,
+    "body": {
+      "username": username,
+      "tier": tier
+    }
+  })
+  if !resp.success (
+    return { error: "Request failed" }
+  )
+  any parsed = resp.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return { error: "Invalid response" }
+  )
+  return parsed.assert(object)
+)

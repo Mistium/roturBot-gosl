@@ -163,9 +163,21 @@ def sendResponse(*Connection c, object msg, string content) object (
     wait 0.1
   )
   object sent = getListenedMessage(listener)
-  if sent.id != null and sent.id.toStr() != "" (
-    reactToMessage(c, sent.channel.toStr(), sent.id.toStr(), "💰")
+  return sent
+)
+
+def sendMessage(*Connection c, string channel_id, string content) object (
+  string listener = randomString(20)
+  c.Send({
+    cmd: "message_new",
+    channel: channel_id,
+    content: content,
+    listener: listener
+  })
+  while !recent_message_listeners.contains(listener) (
+    wait 0.1
   )
+  object sent = getListenedMessage(listener)
   return sent
 )
 

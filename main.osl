@@ -104,8 +104,11 @@ import "./slashes/register_stats.osl"
 import "./slashes/register_misc.osl"
 
 import "./handlers/message_new.osl"
+import "./personality_store.osl"
 
 mainloop:
+
+  initUserPersonalities()
 
   registerCommand("!hello", hello)
   registerCommand("!roturacc", roturacc)
@@ -127,7 +130,7 @@ mainloop:
     boot_conn = boot_raw.assert("*Connection")
     boot_conn.OnMessage(messageHandler)
     boot_conn.EnableReconnect()
-    boot_conn.data.serverUrl = connect_url
+    boot_conn.Set("serverUrl", connect_url)
     connections[connect_url] = boot_conn
   )
 

@@ -38,35 +38,58 @@ def queryAI(array messages, string tier, bool use_tools, array tools) object (
     body.parallel_tool_calls = true
   )
 
-  object response = requests.Post("https://integrate.api.nvidia.com/v1/chat/completions", {
-    "Content-Type": "application/json",
-    "Authorization": "Bearer " ++ api_key,
-    "body": body
-  })
+  number max_retries = 10
+  number retry_count = 0
 
-  if !response.success (
-    return { error: "API request failed" }
+  while retry_count < max_retries (
+    object response = requests.Post("https://integrate.api.nvidia.com/v1/chat/completions", {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " ++ api_key,
+      "body": body
+    })
+
+    if !response.success (
+      if retry_count < max_retries - 1 (
+        retry_count += 1
+        wait 2
+        continue
+      )
+      return { error: "API request failed" }
+    )
+
+    number status = response.status.toNum()
+
+    if status == 429 or status == 500 or status == 502 or status == 503 or status == 504 (
+      if retry_count < max_retries - 1 (
+        retry_count += 1
+        wait 2
+        continue
+      )
+      return { error: "API request failed with status " ++ status.toStr() ++ " after " ++ retry_count.toStr() ++ " retries" }
+    )
+
+    if status != 200 (
+      return { error: "API request failed with status " ++ status.toStr() }
+    )
+
+    any parsedRaw = response.body.toStr().JsonParse()
+
+    if typeof(parsedRaw) != "object" (
+      return { error: "Invalid response format" }
+    )
+
+    object parsed = parsedRaw.assert(object)
+
+    if parsed.error != null (
+      return { error: parsed.error.toStr() }
+    )
+
+    if !parsed.contains("choices") (
+      return { error: "Invalid response format" }
+    )
+
+    return parsed
   )
 
-  if response.status != 200 (
-    return { error: "API request failed with status " ++ response.status.toStr() }
-  )
-
-  any parsedRaw = response.body.toStr().JsonParse()
-
-  if typeof(parsedRaw) != "object" (
-    return { error: "Invalid response format" }
-  )
-
-  object parsed = parsedRaw.assert(object)
-
-  if parsed.error != null (
-    return { error: parsed.error.toStr() }
-  )
-
-  if !parsed.contains("choices") (
-    return { error: "Invalid response format" }
-  )
-
-  return parsed
+  return { error: "Max retries exceeded" }
 )

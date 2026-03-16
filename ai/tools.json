@@ -432,6 +432,25 @@
   {
     "type": "function",
     "function": {
+      "name": "search_messages",
+      "description": "Search for messages in the current channel by query text. Returns messages that contain the search term.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query to find in messages"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "silent_exit",
       "description": "Stop processing and send no text response. Use when you only want to react or have nothing meaningful to say.",
       "parameters": {

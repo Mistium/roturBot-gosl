@@ -1,0 +1,68 @@
+def _getPersonalitiesFile() string (
+  return "./store/user_personalities.json"
+)
+
+def _loadUserPersonalities() object (
+  string path = _getPersonalitiesFile()
+  string data = fs.ReadFile(path)
+  
+  if data.len == 0 (
+    return {}
+  )
+  
+  any parsed = data.JsonParse()
+  
+  if typeof(parsed) != "object" (
+    return {}
+  )
+  
+  return parsed.assert(object)
+)
+
+def _saveUserPersonalities(object personalities) (
+  string path = _getPersonalitiesFile()
+  fs.WriteFile(path, personalities.toStr())
+)
+
+def loadUserPersonalities() object (
+  return _loadUserPersonalities()
+)
+
+def saveUserPersonality(string user_id, string personality_name) object (
+  if personality_name.len == 0 (
+    return { error: "personality_name is required" }
+  )
+  
+  object personalities = _loadUserPersonalities()
+  personalities[user_id] = personality_name
+  _saveUserPersonalities(personalities)
+  
+  return { success: true, user_id: user_id, personality: personality_name }
+)
+
+def getUserPersonalityName(string user_id) string (
+  object personalities = _loadUserPersonalities()
+  return (personalities[user_id] ?? "roturbot").toStr()
+)
+
+def deleteUserPersonality(string user_id) object (
+  object personalities = _loadUserPersonalities()
+  
+  if personalities.contains(user_id) (
+    personalities.delete(user_id)
+    _saveUserPersonalities(personalities)
+    return { success: true }
+  )
+  
+  return { success: true }
+)
+
+def initUserPersonalities() (
+  object personalities = _loadUserPersonalities()
+  array keys = personalities.getKeys()
+  for i keys.len (
+    string user_id = keys[i].toStr()
+    string personality_name = personalities[user_id].toStr()
+    user_personalities[user_id] = personality_name
+  )
+)
