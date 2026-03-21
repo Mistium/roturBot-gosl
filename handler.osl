@@ -1,7 +1,3 @@
-// Store timestamps for cleanup (TTL is 30 seconds = 30000ms)
-// Timeout attempts: 100 * 0.1s = 10 seconds max wait
-object recent_message_timestamps = {}
-
 def messageHandler(*Connection c, string message) (
   any json_raw = message.JsonParse()
   if typeof(json_raw) != "object" (
@@ -21,7 +17,7 @@ def messageHandler(*Connection c, string message) (
     )
   )
 
-  // Periodic cleanup of stale messages (every 100 messages or so)
+  // Periodic cleanup of stale messages
   if recent_listened_messages.getKeys().len > 50 (
     cleanupStaleMessages()
   )
@@ -31,7 +27,10 @@ def messageHandler(*Connection c, string message) (
     case "handshake"
       object val = json.val
       log "Connected to " ++ (val.server.name ?? "unknown")
-      c.Send({ cmd: "auth", validator: generateValidator(config.token, val.validator_key) })
+      c.Send({
+        cmd: "auth",
+        validator: generateValidator(config.token, val.validator_key)
+      })
     case "auth_success"
       log "Authentication successful"
     case "auth_error"
@@ -105,7 +104,12 @@ def getListenedMessage(string listener) object (
 )
 
 def reactToMessage(*Connection c, string channel, string message_id, string emoji) (
-  c.Send({ cmd: "message_react_add", channel: channel, id: message_id, emoji: emoji })
+  c.Send({
+    cmd: "message_react_add",
+    channel: channel,
+    id: message_id,
+    emoji: emoji
+  })
 )
 
 def registerCommand(string name, any handler) (
@@ -163,13 +167,24 @@ def sendResponse(*Connection c, object msg, string content) object (
   if msg.command != null (
     string react_key = msg.command.toStr() ++ ":" ++ msg.invoker.toStr()
     pending_reactions[react_key] = true
-    c.Send({ cmd: "slash_response", channel: msg.channel, response: content, command: msg.command, invoker: msg.invoker })
+    c.Send({
+      cmd: "slash_response",
+      channel: msg.channel,
+      response: content,
+      command: msg.command,
+      invoker: msg.invoker
+    })
     return {}
   )
 
   object data = rawToMsg(msg)
   string listener = randomString(20)
-  c.Send({ cmd: "message_new", channel: data.channel, content: content, listener: listener })
+  c.Send({
+    cmd: "message_new",
+    channel: data.channel,
+    content: content,
+    listener: listener
+  })
 
   number attempts = 0
   number maxAttempts = 100
@@ -188,7 +203,12 @@ def sendResponse(*Connection c, object msg, string content) object (
 
 def sendMessage(*Connection c, string channel_id, string content) object (
   string listener = randomString(20)
-  c.Send({ cmd: "message_new", channel: channel_id, content: content, listener: listener })
+  c.Send({
+    cmd: "message_new",
+    channel: channel_id,
+    content: content,
+    listener: listener
+  })
 
   number attempts = 0
   number maxAttempts = 100
@@ -208,7 +228,13 @@ def sendMessage(*Connection c, string channel_id, string content) object (
 def sendReply(*Connection c, object msg, string content) object (
   object data = rawToMsg(msg)
   string listener = randomString(20)
-  c.Send({ cmd: "message_new", channel: data.channel, content: content, reply_to: data.id, listener: listener })
+  c.Send({
+    cmd: "message_new",
+    channel: data.channel,
+    content: content,
+    reply_to: data.id,
+    listener: listener
+  })
 
   number attempts = 0
   number maxAttempts = 100
@@ -228,7 +254,13 @@ def editMessage(*Connection c, object msg, string content) object (
   object data = rawToMsg(msg)
   log "editMessage: channel=" ++ data.channel.toStr() ++ " id=" ++ data.id.toStr()
   string listener = randomString(20)
-  c.Send({ cmd: "message_edit", channel: data.channel, id: data.id, content: content, listener: listener })
+  c.Send({
+    cmd: "message_edit",
+    channel: data.channel,
+    id: data.id,
+    content: content,
+    listener: listener
+  })
 
   number attempts = 0
   number maxAttempts = 100

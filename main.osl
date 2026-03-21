@@ -8,6 +8,8 @@ string API_BASE = "https://api.rotur.dev"
 
 array recent_message_listeners = []
 object recent_listened_messages = {}
+object recent_message_timestamps = {}
+number MAX_TIMEOUT_ATTEMPTS = 100
 object connections = {}
 array servers = ["wss://chats.mistium.com", "wss://dms.mistium.com"]
 object commands = {}
