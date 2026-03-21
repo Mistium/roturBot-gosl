@@ -23,7 +23,7 @@ jobs:
         git clone https://github.com/originOSL/OSL.go.git
         cd OSL.go
         go build -o osl .
-        sudo mv osl /usr/local/bin/
+        ./osl setup
 
     - name: Check OSL version
       run: osl version
