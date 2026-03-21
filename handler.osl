@@ -83,11 +83,6 @@ def cleanupStaleMessages() (
       if now - msgTime > ttl (
         recent_listened_messages.delete(key)
         recent_message_timestamps.delete(key)
-        // Remove from listeners array
-        number idx = recent_message_listeners.indexOf(key)
-        if idx > 0 (
-          recent_message_listeners.splice(idx, 1)
-        )
       )
     )
   )
