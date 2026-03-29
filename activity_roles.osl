@@ -1,16 +1,32 @@
 def getRoleThreshold(string role) number (
-  if role == "Active 100+" ( return 100 )
-  if role == "Active 500+" ( return 500 )
-  if role == "Active 1000+" ( return 1000 )
-  if role == "Active 3000+" ( return 3000 )
+  if role == "Active 100+" (
+    return 100
+  )
+  if role == "Active 500+" (
+    return 500
+  )
+  if role == "Active 1000+" (
+    return 1000
+  )
+  if role == "Active 3000+" (
+    return 3000
+  )
   return 0
 )
 
 def getTierName(string role) string (
-  if role == "Active 100+" ( return "Active (100+ messages)" )
-  if role == "Active 500+" ( return "Active (500+ messages)" )
-  if role == "Active 1000+" ( return "Active (1000+ messages)" )
-  if role == "Active 3000+" ( return "Active (3000+ messages)" )
+  if role == "Active 100+" (
+    return "Active (100+ messages)"
+  )
+  if role == "Active 500+" (
+    return "Active (500+ messages)"
+  )
+  if role == "Active 1000+" (
+    return "Active (1000+ messages)"
+  )
+  if role == "Active 3000+" (
+    return "Active (3000+ messages)"
+  )
   return "Inactive"
 )
 
