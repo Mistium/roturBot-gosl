@@ -1,0 +1,30 @@
+def users_list(*Connection c, object json, string token) (
+  any users_raw = json.users
+  if typeof(users_raw) != "array" (
+    log "ActivityRoles: users_list has no users array"
+    return
+  )
+  array users = users_raw.assert(array)
+  log "ActivityRoles: Caching roles for " ++ users.len.toStr() ++ " users"
+
+  for i users.len (
+    any user_raw = users[i]
+    if typeof(user_raw) != "object" (
+      continue
+    )
+    object user = user_raw.assert(object)
+
+    string username = (user.username ?? "").toStr()
+    if username == "" (
+      continue
+    )
+
+    any roles_raw = user.roles
+    array roles = []
+    if typeof(roles_raw) == "array" (
+      roles = roles_raw.assert(array)
+    )
+
+    cacheUserRoles(username, roles)
+  )
+)

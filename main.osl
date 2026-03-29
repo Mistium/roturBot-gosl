@@ -3,6 +3,7 @@ import "osl/requests"
 import "osl/fs"
 import "osl/crypto"
 import "osl/arrays"
+import "osl/lock"
 
 string API_BASE = "https://api.rotur.dev"
 
@@ -29,12 +30,40 @@ object ADMIN_HEADERS = {
   "Content-Type": "application/json",
 }
 
+// ----- Counting System -----
+
 // Counting system globals
 string COUNTING_SERVER = "wss://chats.mistium.com"
 string COUNTING_CHANNEL_NAME = "counting"
 string COUNTING_STATE_FILE = "store/counting_state.json"
 bool _counting_state_loaded = false
 object _counting_state = {}
+
+// ----- Message Tracker -----
+
+string MESSAGE_TRACKER_FILE = "./store/message_tracker.json"
+
+object _message_tracker_data = {}
+bool _message_tracker_loaded = false
+
+
+// ----- Activity Roles -----
+string ACTIVITY_ROLES_FILE = "./store/activity_roles.json"
+string ACTIVITY_ANNOUNCE_CHANNEL = "general"
+
+object _activity_roles_data = {}
+bool _activity_roles_loaded = false
+object _users_list_cache = {}
+object _pending_role_updates = {}
+
+array ACTIVITY_THRESHOLDS = [
+  { threshold: 3000, role: "Active 3000+" },
+  { threshold: 1000, role: "Active 1000+" },
+  { threshold: 500, role: "Active 500+" },
+  { threshold: 100, role: "Active 100+" }
+]
+
+array ACTIVITY_ROLE_NAMES = ["Active 100+", "Active 500+", "Active 1000+", "Active 3000+"]
 
 import "./ai/ai.osl"
 import "./ai/vercel.osl"
@@ -48,6 +77,8 @@ import "./rotur.osl"
 import "./message_cache.osl"
 import "./helpers.osl"
 import "./memory.osl"
+import "./message_tracker.osl"
+import "./activity_roles.osl"
 import "./emotional_state.osl"
 import "./relationship.osl"
 
@@ -96,6 +127,8 @@ import "./slashes/friends/requests reject all.osl"
 // stats
 import "./slashes/stats/totalusers.osl"
 import "./slashes/stats/accorigins.osl"
+import "./slashes/stats/messages.osl"
+import "./slashes/stats/top.osl"
 
 // counting
 import "./counting.osl"
@@ -117,6 +150,10 @@ import "./slashes/register_misc.osl"
 import "./slashes/register_counting.osl"
 
 import "./handlers/message_new.osl"
+import "./handlers/roles_list.osl"
+import "./handlers/user_roles_get.osl"
+import "./handlers/users_list.osl"
+
 import "./personality_store.osl"
 
 mainloop:
@@ -148,6 +185,7 @@ mainloop:
     connections[connect_url] = boot_conn
   )
 
-  while true (
-    wait 60000
-  )
+while true (
+  wait 3600000
+  checkActivityRoleDrops()
+)

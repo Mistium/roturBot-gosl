@@ -1,0 +1,211 @@
+def _loadMessageTracker() (
+  lock.Lock("message_tracker")
+
+  if _message_tracker_loaded (
+    lock.Unlock("message_tracker")
+    return
+  )
+
+  string data = fs.ReadFile(MESSAGE_TRACKER_FILE)
+  if data.len == 0 (
+    _message_tracker_data = {}
+    _message_tracker_loaded = true
+    lock.Unlock("message_tracker")
+    return
+  )
+
+  any parsed = data.JsonParse()
+  if typeof(parsed) != "object" (
+    _message_tracker_data = {}
+    _message_tracker_loaded = true
+    lock.Unlock("message_tracker")
+    return
+  )
+
+  _message_tracker_data = parsed.assert(object)
+  _message_tracker_loaded = true
+
+  lock.Unlock("message_tracker")
+)
+
+
+def _saveMessageTracker() (
+  lock.Lock("message_tracker")
+  string data = _message_tracker_data.toStr()
+  lock.Unlock("message_tracker")
+
+  fs.WriteFile(MESSAGE_TRACKER_FILE, data)
+)
+
+def trackMessage(string username) (
+  _loadMessageTracker()
+
+  lock.Lock("message_tracker")
+
+  string period_key = round(timestamp / 1800000).toStr()
+
+  if !_message_tracker_data.contains(period_key) (
+    _message_tracker_data[period_key] = {}
+  )
+
+  object period_data = _message_tracker_data[period_key].assert(object)
+
+  string user_lower = username.toLower()
+  if !period_data.contains(user_lower) (
+    period_data[user_lower] = 0
+  )
+
+  period_data[user_lower] = period_data[user_lower].toNum() + 1
+  _message_tracker_data[period_key] = period_data
+
+  lock.Unlock("message_tracker")
+
+  _cleanupOldPeriods()
+  _saveMessageTracker()
+)
+
+def _cleanupOldPeriods() (
+  lock.Lock("message_tracker")
+
+  number seven_days_ms = 7 * 24 * 60 * 60 * 1000
+  number cutoff = timestamp - seven_days_ms
+  number cutoff_period = round(cutoff / 1800000)
+
+  array keys = _message_tracker_data.getKeys()
+  for i keys.len (
+    number key_num = keys[i].toStr().toNum()
+    if key_num < cutoff_period (
+      _message_tracker_data.delete(keys[i].toStr())
+    )
+  )
+
+  lock.Unlock("message_tracker")
+)
+
+def getMessageCounts7Days() object (
+  _loadMessageTracker()
+
+  lock.Lock("message_tracker")
+
+  number seven_days_ms = 7 * 24 * 60 * 60 * 1000
+  number cutoff = timestamp - seven_days_ms
+  number cutoff_period = round(cutoff / 1800000)
+
+  object user_totals = {}
+
+  array keys = _message_tracker_data.getKeys()
+  for i keys.len (
+    number key_num = keys[i].toStr().toNum()
+    if key_num < cutoff_period (
+      continue
+    )
+
+    any period_raw = _message_tracker_data[keys[i].toStr()]
+    if typeof(period_raw) != "object" (
+      continue
+    )
+
+    object period_data = period_raw.assert(object)
+    array users = period_data.getKeys()
+
+    for j users.len (
+      string user = users[j].toStr()
+      number count = period_data[user].toNum()
+
+      if !user_totals.contains(user) (
+        user_totals[user] = 0
+      )
+      user_totals[user] = user_totals[user].toNum() + count
+    )
+  )
+
+  lock.Unlock("message_tracker")
+
+  return user_totals
+)
+
+def getMessageCountsByPeriod() object (
+  _loadMessageTracker()
+
+  lock.Lock("message_tracker")
+
+  auto now = round(timestamp)
+  number hour_ago = now - (60 * 60 * 1000)
+  number day_ago = now - (24 * 60 * 60 * 1000)
+  number week_ago = now - (7 * 24 * 60 * 60 * 1000)
+  number month_ago = now - (30 * 24 * 60 * 60 * 1000)
+
+  number hour_period = round(hour_ago / 1800000)
+  number day_period = round(day_ago / 1800000)
+  number week_period = round(week_ago / 1800000)
+  number month_period = round(month_ago / 1800000)
+
+  object hour_counts = {}
+  object day_counts = {}
+  object week_counts = {}
+  object month_counts = {}
+
+  array keys = _message_tracker_data.getKeys()
+  for i keys.len (
+    number key_num = keys[i].toStr().toNum()
+
+    any period_raw = _message_tracker_data[keys[i].toStr()]
+    if typeof(period_raw) != "object" (
+      continue
+    )
+    object period_data = period_raw.assert(object)
+    array users = period_data.getKeys()
+
+    for j users.len (
+      string user = users[j].toStr()
+      number count = period_data[user].toNum()
+
+      if key_num >= hour_period (
+        if !hour_counts.contains(user) (
+          hour_counts[user] = 0
+        )
+        hour_counts[user] = hour_counts[user].toNum() + count
+      )
+
+      if key_num >= day_period (
+        if !day_counts.contains(user) (
+          day_counts[user] = 0
+        )
+        day_counts[user] = day_counts[user].toNum() + count
+      )
+
+      if key_num >= week_period (
+        if !week_counts.contains(user) (
+          week_counts[user] = 0
+        )
+        week_counts[user] = week_counts[user].toNum() + count
+      )
+
+      if key_num >= month_period (
+        if !month_counts.contains(user) (
+          month_counts[user] = 0
+        )
+        month_counts[user] = month_counts[user].toNum() + count
+      )
+    )
+  )
+
+  lock.Unlock("message_tracker")
+
+  return {
+    hour: hour_counts,
+    day: day_counts,
+    week: week_counts,
+    month: month_counts
+  }
+)
+
+def getUserMessageCount7Days(string username) number (
+  object totals = getMessageCounts7Days()
+  string user_lower = username.toLower()
+
+  if !totals.contains(user_lower) (
+    return 0
+  )
+  return totals[user_lower].toNum()
+)

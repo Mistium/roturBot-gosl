@@ -6,9 +6,15 @@ def message_new(*Connection c, object json, string token) (
     return
   )
 
-  addMessageToCache(json.channel.toStr(), msg)
-
   string server_url = c.Get("serverUrl").toStr()
+
+  if server_url == "wss://chats.mistium.com" (
+    trackMessage(msg.user.toStr())
+    number count = getUserMessageCount7Days(msg.user.toStr())
+    updateActivityRole(c, msg.user.toStr(), count)
+  )
+
+  addMessageToCache(json.channel.toStr(), msg)
 
   object counting_msg = rawToMsg(json)
   if handleCountingMessage(c, counting_msg, server_url) (

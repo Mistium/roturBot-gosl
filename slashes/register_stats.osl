@@ -13,4 +13,18 @@ def registerStatsCommands() (
     options: [],
     ephemeral: false
   })
+
+  registerSlashCommand("messages", messages, {
+    name: "messages",
+    description: "See how many messages you have sent in the past hour, day, week, and month",
+    options: [],
+    ephemeral: false
+  })
+
+  registerSlashCommand("top", top, {
+    name: "top",
+    description: "See the top 10 most active users in the past week",
+    options: [],
+    ephemeral: false
+  })
 )

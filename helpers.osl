@@ -18,7 +18,7 @@ def formatThinkingTime(number start_time) string (
 )
 
 def transferCredits(string from_user, string to_user, number amount, string note) object (
-  string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ to_user ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ from_user ++ "&note=" ++ note
+  string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ to_user ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ from_user ++ "&note=" ++ encodeURIComponent(note)
   object resp = requests.Post(url, ADMIN_HEADERS)
 
   any body = resp.body.toStr().JsonParse()

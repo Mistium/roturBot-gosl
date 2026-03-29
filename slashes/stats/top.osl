@@ -1,0 +1,66 @@
+def top(*Connection c, object msg) (
+  object counts = getMessageCountsByPeriod()
+  any week_raw = counts.week
+
+  if typeof(week_raw) != "object" (
+    sendResponse(c, msg, "No message data available.")
+    return
+  )
+
+  object week_counts = week_raw.assert(object)
+  array users = week_counts.getKeys()
+
+  if users.len == 0 (
+    sendResponse(c, msg, "No messages tracked yet.")
+    return
+  )
+
+  array sorted_users = []
+  for i users.len (
+    string user = users[i].toStr()
+    number count = week_counts[user].toNum()
+    sorted_users.append({ user: user, count: count })
+  )
+
+  bool swapped = true
+  while swapped (
+    swapped = false
+    for i sorted_users.len - 1 (
+      object a = sorted_users[i].assert(object)
+      object b = sorted_users[i + 1].assert(object)
+      if a.count.toNum() < b.count.toNum() (
+        sorted_users[i] = b
+        sorted_users[i + 1] = a
+        swapped = true
+      )
+    )
+  )
+
+  number limit = 10
+  if sorted_users.len < limit (
+    limit = sorted_users.len.toNum()
+  )
+
+  string result = "**Top " ++ limit.toStr() ++ " most active users (past week):**\n"
+
+  for i limit (
+    object entry = sorted_users[i].assert(object)
+    string user = entry.user.toStr()
+    number count = entry.count.toNum()
+
+    string medal = ""
+    if i == 1 (
+      medal = "🥇 "
+    )
+    if i == 2 (
+      medal = "🥈 "
+    )
+    if i == 3 (
+      medal = "🥉 "
+    )
+
+    result = result ++ medal ++ "**#" ++ i.toStr() ++ "** " ++ user ++ " - " ++ count.toStr() ++ " messages\n"
+  )
+
+  sendResponse(c, msg, result)
+)

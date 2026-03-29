@@ -1,0 +1,326 @@
+def getRoleThreshold(string role) number (
+  if role == "Active 100+" ( return 100 )
+  if role == "Active 500+" ( return 500 )
+  if role == "Active 1000+" ( return 1000 )
+  if role == "Active 3000+" ( return 3000 )
+  return 0
+)
+
+def getTierName(string role) string (
+  if role == "Active 100+" ( return "Active (100+ messages)" )
+  if role == "Active 500+" ( return "Active (500+ messages)" )
+  if role == "Active 1000+" ( return "Active (1000+ messages)" )
+  if role == "Active 3000+" ( return "Active (3000+ messages)" )
+  return "Inactive"
+)
+
+def sendActivityAnnouncement(*Connection c, string username, string old_role, string new_role) (
+  any conn_raw = connections["wss://chats.mistium.com"]
+  if typeof(conn_raw) != "*Connection" (
+    return
+  )
+  "*Connection" chat_conn = conn_raw.assert("*Connection")
+
+  string message = ""
+  if old_role == "" (
+    message = "@**" ++ username ++ "** has earned the **" ++ getTierName(new_role) ++ "** role! 🎉"
+  ) else (
+    if new_role == "" (
+      message = "@**" ++ username ++ "** is no longer active enough to maintain their activity role."
+    ) else (
+      number old_threshold = getRoleThreshold(old_role)
+      number new_threshold = getRoleThreshold(new_role)
+      if new_threshold > old_threshold (
+        message = "@**" ++ username ++ "** has ranked up to **" ++ getTierName(new_role) ++ "**! 🎉"
+      ) else (
+        message = "@**" ++ username ++ "** has dropped to **" ++ getTierName(new_role) ++ "**."
+      )
+    )
+  )
+
+  sendMessage(chat_conn, ACTIVITY_ANNOUNCE_CHANNEL, message)
+)
+
+def _loadActivityRoles() (
+  lock.Lock("activity_roles")
+
+  if _activity_roles_loaded (
+    lock.Unlock("activity_roles")
+    return
+  )
+
+  string data = fs.ReadFile(ACTIVITY_ROLES_FILE)
+  if data.len == 0 (
+    _activity_roles_data = {}
+    _activity_roles_loaded = true
+    lock.Unlock("activity_roles")
+    return
+  )
+
+  any parsed = data.JsonParse()
+  if typeof(parsed) != "object" (
+    _activity_roles_data = {}
+    _activity_roles_loaded = true
+    lock.Unlock("activity_roles")
+    return
+  )
+
+  _activity_roles_data = parsed.assert(object)
+  _activity_roles_loaded = true
+
+  lock.Unlock("activity_roles")
+)
+
+def _saveActivityRoles() (
+  lock.Lock("activity_roles")
+  string data = _activity_roles_data.toStr()
+  lock.Unlock("activity_roles")
+
+  fs.WriteFile(ACTIVITY_ROLES_FILE, data)
+)
+
+def getActivityRoleForCount(number count) string (
+  for i ACTIVITY_THRESHOLDS.len (
+    object threshold_info = ACTIVITY_THRESHOLDS[i].assert(object)
+    number threshold = threshold_info.threshold.toNum()
+    if count >= threshold (
+      return threshold_info.role.toStr()
+    )
+  )
+  return ""
+)
+
+def removeActivityRoles(array roles) array (
+  array result = []
+  for i roles.len (
+    string role = roles[i].toStr()
+    bool is_activity_role = false
+    for j ACTIVITY_ROLE_NAMES.len (
+      if role == ACTIVITY_ROLE_NAMES[j].toStr() (
+        is_activity_role = true
+        break
+      )
+    )
+    if !is_activity_role (
+      result.append(role)
+    )
+  )
+  return result
+)
+
+def cacheUserRoles(string username, array roles) (
+  lock.Lock("users_list_cache")
+  string user_lower = username.toLower()
+  _users_list_cache[user_lower] = roles
+  lock.Unlock("users_list_cache")
+)
+
+def getUserRolesFromCache(string username) array (
+  lock.Lock("users_list_cache")
+  string user_lower = username.toLower()
+  if !_users_list_cache.contains(user_lower) (
+    lock.Unlock("users_list_cache")
+    return []
+  )
+  any roles_raw = _users_list_cache[user_lower]
+  array roles = []
+  if typeof(roles_raw) == "array" (
+    roles = roles_raw.assert(array)
+  )
+  lock.Unlock("users_list_cache")
+  return roles
+)
+
+def requestUsersList(*Connection c) (
+  c.Send({ cmd: "users_list" })
+)
+
+def requestUserRoles(*Connection c, string username) (
+  c.Send({
+    cmd: "user_roles_get",
+    user: username
+  })
+)
+
+def sendUserRolesSet(*Connection c, string username, array roles) (
+  c.Send({
+    cmd: "user_roles_set",
+    user: username,
+    roles: roles
+  })
+)
+
+def queueActivityRoleUpdate(string username, number message_count) (
+  lock.Lock("pending_role_updates")
+  string user_lower = username.toLower()
+  _pending_role_updates[user_lower] = { username: username, count: message_count }
+  lock.Unlock("pending_role_updates")
+)
+
+def getAndClearPendingRoleUpdate(string username) object (
+  lock.Lock("pending_role_updates")
+  string user_lower = username.toLower()
+  if !_pending_role_updates.contains(user_lower) (
+    lock.Unlock("pending_role_updates")
+    return null
+  )
+  object update_data = _pending_role_updates[user_lower].assert(object)
+  _pending_role_updates.delete(user_lower)
+  lock.Unlock("pending_role_updates")
+  return update_data
+)
+
+def processPendingRoleUpdates(*Connection c) (
+  lock.Lock("pending_role_updates")
+  array keys = _pending_role_updates.getKeys()
+  array to_process = []
+  for i keys.len (
+    to_process.append(keys[i].toStr())
+  )
+  lock.Unlock("pending_role_updates")
+
+  for i to_process.len (
+    string user_lower = to_process[i].toStr()
+    lock.Lock("pending_role_updates")
+    if !_pending_role_updates.contains(user_lower) (
+      lock.Unlock("pending_role_updates")
+      continue
+    )
+    object update_data = _pending_role_updates[user_lower].assert(object)
+    _pending_role_updates.delete(user_lower)
+    lock.Unlock("pending_role_updates")
+
+    string username = update_data.username.toStr()
+    number count = update_data.count.toNum()
+
+    array cached_roles = getUserRolesFromCache(username)
+    if cached_roles.len == 0 (
+      requestUserRoles(c, username)
+      continue
+    )
+
+    _performActivityRoleUpdate(c, username, cached_roles, count)
+  )
+)
+
+def getActivityRoleStored(string user_lower) string (
+  lock.Lock("activity_roles")
+  if !_activity_roles_data.contains(user_lower) (
+    lock.Unlock("activity_roles")
+    return ""
+  )
+  string stored = _activity_roles_data[user_lower].toStr()
+  lock.Unlock("activity_roles")
+  return stored
+)
+
+def setActivityRoleStored(string user_lower, string role) (
+  lock.Lock("activity_roles")
+  if role != "" (
+    _activity_roles_data[user_lower] = role
+  ) else (
+    if _activity_roles_data.contains(user_lower) (
+      _activity_roles_data.delete(user_lower)
+    )
+  )
+  lock.Unlock("activity_roles")
+)
+
+def _performActivityRoleUpdate(*Connection c, string username, array current_roles, number message_count) (
+  _loadActivityRoles()
+
+  string user_lower = username.toLower()
+  string current_stored_role = getActivityRoleStored(user_lower)
+
+  string new_role = getActivityRoleForCount(message_count)
+
+  log "ActivityRoles: " ++ username ++ " has " ++ message_count.toStr() ++ " messages, role: " ++ (new_role ?? "none") ++ ", stored: " ++ (current_stored_role ?? "none")
+
+  if new_role == current_stored_role (
+    return
+  )
+
+  log "ActivityRoles: Updating " ++ username ++ " to " ++ (new_role ?? "no activity role")
+
+  setActivityRoleStored(user_lower, new_role)
+  _saveActivityRoles()
+
+  array cleaned_roles = removeActivityRoles(current_roles)
+  if new_role != "" (
+    cleaned_roles.append(new_role)
+  )
+
+  sendUserRolesSet(c, username, cleaned_roles)
+  sendActivityAnnouncement(c, username, current_stored_role, new_role)
+)
+
+def updateActivityRole(*Connection c, string username, number message_count) (
+  string server_url = c.Get("serverUrl").toStr()
+  if server_url != "wss://chats.mistium.com" (
+    return
+  )
+
+  array cached_roles = getUserRolesFromCache(username)
+  if cached_roles.len == 0 (
+    log "ActivityRoles: No cached roles for " ++ username ++ ", requesting..."
+    queueActivityRoleUpdate(username, message_count)
+    requestUserRoles(c, username)
+    return
+  )
+
+  _performActivityRoleUpdate(c, username, cached_roles, message_count)
+)
+
+def checkActivityRoleDrops() (
+  any conn_raw = connections["wss://chats.mistium.com"]
+  if typeof(conn_raw) != "*Connection" (
+    return
+  )
+  "*Connection" c = conn_raw.assert("*Connection")
+
+  _loadActivityRoles()
+
+  object counts = getMessageCountsByPeriod()
+  any week_raw = counts.week
+
+  if typeof(week_raw) != "object" (
+    return
+  )
+
+  object week_counts = week_raw.assert(object)
+
+  lock.Lock("activity_roles")
+  array stored_users = _activity_roles_data.getKeys()
+  array users_copy = []
+  for i stored_users.len (
+    users_copy.append(stored_users[i].toStr())
+  )
+  lock.Unlock("activity_roles")
+
+  for i users_copy.len (
+    string user_lower = users_copy[i].toStr()
+    string stored_role = getActivityRoleStored(user_lower)
+
+    if stored_role == "" (
+      continue
+    )
+
+    number count = 0
+    if week_counts.contains(user_lower) (
+      count = week_counts[user_lower].toNum()
+    )
+
+    string new_role = getActivityRoleForCount(count)
+
+    if new_role != stored_role (
+      string username = user_lower
+      array cached_roles = getUserRolesFromCache(username)
+      if cached_roles.len == 0 (
+        queueActivityRoleUpdate(username, count)
+        requestUserRoles(c, username)
+      ) else (
+        _performActivityRoleUpdate(c, username, cached_roles, count)
+      )
+    )
+  )
+)

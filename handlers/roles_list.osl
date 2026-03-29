@@ -1,0 +1,3 @@
+def roles_list(*Connection c, object json, string token) (
+  log json
+)

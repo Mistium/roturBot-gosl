@@ -27,12 +27,22 @@ def messageHandler(*Connection c, string message) (
     case "ready"
       log "Ready to receive messages, user: " ++ (json.user.username ?? "unknown")
       registerAllSlashCommands(c)
+      string server_url = c.Get("serverUrl").toStr()
+      if server_url == "wss://chats.mistium.com" (
+        requestUsersList(c)
+      )
     case "user_connect"
       // log "User connected: " ++ (user.username ?? "unknown")
     case "user_disconnect"
       // log "User disconnected: " ++ (json.username ?? "unknown")
     case "message_new"
       message_new(c, json, config.token.toStr())
+    case "roles_list"
+      roles_list(c, json, config.token.toStr())
+    case "users_list"
+      users_list(c, json, config.token.toStr())
+    case "user_roles_get"
+      user_roles_get(c, json, config.token.toStr())
     case "slash_call"
       handleSlashCall(c, json)
     case "slash_register"
@@ -56,6 +66,7 @@ def messageHandler(*Connection c, string message) (
     case "channels_get"
 
     case "error"
+      log "Error: " ++ (json.val ?? "unknown")
     default
       // log "Unknown command: " ++ (json.cmd ?? "unknown")
       // log json

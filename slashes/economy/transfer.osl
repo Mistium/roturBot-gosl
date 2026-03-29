@@ -42,7 +42,7 @@ def transfer(*Connection c, object msg) (
     return
   )
 
-  string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ username ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ msg.user ++ "&note=" ++ note
+  string url = "https://api.rotur.dev/admin/transfer_credits?to=" ++ username ++ "&amount=" ++ amount.toStr() ++ "&from=" ++ msg.user ++ "&note=" ++ encodeURIComponent(note)
   object resp = requests.Post(url, ADMIN_HEADERS)
 
   any body = resp.body.toStr().JsonParse()

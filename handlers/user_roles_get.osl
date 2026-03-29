@@ -1,0 +1,26 @@
+def user_roles_get(*Connection c, object json, string token) (
+  log json
+  string username = (json.user ?? "").toStr()
+  if username == "" (
+    return
+  )
+
+  any roles_raw = json.roles
+  array roles = []
+  if typeof(roles_raw) == "array" (
+    roles = roles_raw.assert(array)
+  )
+
+  cacheUserRoles(username, roles)
+
+  object pending = getAndClearPendingRoleUpdate(username)
+  if pending != null (
+    number count = pending.count.toNum()
+    "*Connection" conn = null
+    any conn_raw = connections["wss://chats.mistium.com"]
+    if typeof(conn_raw) == "*Connection" (
+      conn = conn_raw.assert("*Connection")
+      _performActivityRoleUpdate(conn, username, roles, count)
+    )
+  )
+)
