@@ -344,7 +344,7 @@ def keysBuy(key_id, auth) object (
 )
 
 def keysCancel(key_id, auth) object (
-  object resp = requests.Delete("https://api.rotur.dev/keys/cancel/" ++ key_id.toStr() ++ "?auth=" ++ auth.toStr(), {
+  object resp = requests.Get("https://api.rotur.dev/keys/cancel/" ++ key_id.toStr() ++ "?auth=" ++ auth.toStr(), {
     "content-type": "application/json"
   })
   if !resp.success (
