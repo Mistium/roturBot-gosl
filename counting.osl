@@ -71,6 +71,20 @@ def _getOrCreateUser(object state, string user_id) object (
   return users[user_id].assert(object)
 )
 
+// Check if a user is an admin (based on config.admin_usernames list)
+def isAdmin(string user_id) bool (
+  if !config.contains("admin_usernames") (
+    return false
+  )
+  array admins = config.admin_usernames.assert(array)
+  for i admins.len (
+    if admins[i].toStr() == user_id (
+      return true
+    )
+  )
+  return false
+)
+
 def extractNumberFromMessage(string content) any (
   string trimmed = content.strip()
   
@@ -99,7 +113,8 @@ def handleCountingMessage(*Connection c, object msg, string server_url) bool (
   object state = getChannelState(channel)
   
   if content.startsWith("!set_count") (
-    if user_id != "Mist" (
+    // Check if user is admin (admin check is done in config.admin_usernames)
+    if !isAdmin(user_id) (
       sendResponse(c, msg, "Only admins can use this command!")
       return true
     )

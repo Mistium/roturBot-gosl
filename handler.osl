@@ -4,13 +4,24 @@ def messageHandler(*Connection c, string message) (
     return
   )
   object json = json_raw.assert(object)
+
   if json.listener != null (
+    // Store with timestamp for TTL cleanup
     recent_listened_messages[json.listener] = json
+    recent_message_timestamps[json.listener] = timestamp
     recent_message_listeners.append(json.listener)
     if recent_message_listeners.len > 1000 (
-      recent_message_listeners.shift()
+      string removed = recent_message_listeners.shift()
+      recent_listened_messages.delete(removed)
+      recent_message_timestamps.delete(removed)
     )
   )
+
+  // Periodic cleanup of stale messages
+  if recent_listened_messages.getKeys().len > 50 (
+    cleanupStaleMessages()
+  )
+
   // log json.cmd
   switch json.cmd (
     case "handshake"
@@ -62,14 +73,29 @@ def messageHandler(*Connection c, string message) (
     case "ping"
     case "message_react_add"
     case "message_react_remove"
-
     case "channels_get"
-
     case "error"
       log "Error: " ++ (json.val ?? "unknown")
     default
       // log "Unknown command: " ++ (json.cmd ?? "unknown")
       // log json
+  )
+)
+
+// Cleanup stale messages that have exceeded TTL (30 seconds)
+def cleanupStaleMessages() (
+  number now = timestamp
+  number ttl = 30000
+  array keys = recent_message_timestamps.getKeys()
+  for i keys.len (
+    string key = keys[i].toStr()
+    if recent_message_timestamps.contains(key) (
+      number msgTime = recent_message_timestamps[key].toNum()
+      if now - msgTime > ttl (
+        recent_listened_messages.delete(key)
+        recent_message_timestamps.delete(key)
+      )
+    )
   )
 )
 
@@ -79,6 +105,7 @@ def getListenedMessage(string listener) object (
   )
   object data = recent_listened_messages[listener]
   recent_listened_messages.delete(listener)
+  recent_message_timestamps.delete(listener)
   return rawToMsg(data)
 )
 
@@ -98,7 +125,7 @@ def registerCommand(string name, any handler) (
 // registerSlashCommand registers a slash command handler alongside its schema
 // for servers that support the slash_register protocol.
 // schema should match the slash command object format:
-//   { name, description, options?, whitelistRoles?, blacklistRoles?, ephemeral? }
+// { name, description, options?, whitelistRoles?, blacklistRoles?, ephemeral? }
 def registerSlashCommand(string name, any handler, object schema) (
   commands["/" ++ name] = handler
   slash_schemas[name] = schema
@@ -109,16 +136,11 @@ def registerAllSlashCommands(*Connection c) (
   if schema_keys.len == 0 (
     return
   )
-
   array cmds = []
   for i schema_keys.len (
     cmds.append(slash_schemas[schema_keys[i].toStr()])
   )
-
-  c.Send({
-    cmd: "slash_register",
-    commands: cmds
-  })
+  c.Send({ cmd: "slash_register", commands: cmds })
 )
 
 def handleSlashCall(*Connection c, object json) (
@@ -127,7 +149,6 @@ def handleSlashCall(*Connection c, object json) (
     return
   )
   object val = val_raw.assert(object)
-
   string command_name = val.command.toStr()
   string handler_key = "/" ++ command_name
 
@@ -145,7 +166,6 @@ def handleSlashCall(*Connection c, object json) (
     command: command_name,
     invoker: json.invoker
   }
-
   commands[handler_key](c, msg)
 )
 
@@ -162,6 +182,7 @@ def sendResponse(*Connection c, object msg, string content) object (
     })
     return {}
   )
+
   object data = rawToMsg(msg)
   string listener = randomString(20)
   c.Send({
@@ -170,9 +191,18 @@ def sendResponse(*Connection c, object msg, string content) object (
     content: content,
     listener: listener
   })
+
+  number attempts = 0
+  number maxAttempts = 100
   while !recent_message_listeners.contains(listener) (
+    if attempts >= maxAttempts (
+      log "sendResponse: timeout waiting for listener " ++ listener
+      return null
+    )
     wait 0.1
+    attempts = attempts + 1
   )
+
   object sent = getListenedMessage(listener)
   return sent
 )
@@ -185,9 +215,18 @@ def sendMessage(*Connection c, string channel_id, string content) object (
     content: content,
     listener: listener
   })
+
+  number attempts = 0
+  number maxAttempts = 100
   while !recent_message_listeners.contains(listener) (
+    if attempts >= maxAttempts (
+      log "sendMessage: timeout waiting for listener " ++ listener
+      return null
+    )
     wait 0.1
+    attempts = attempts + 1
   )
+
   object sent = getListenedMessage(listener)
   return sent
 )
@@ -202,9 +241,18 @@ def sendReply(*Connection c, object msg, string content) object (
     reply_to: data.id,
     listener: listener
   })
+
+  number attempts = 0
+  number maxAttempts = 100
   while !recent_message_listeners.contains(listener) (
+    if attempts >= maxAttempts (
+      log "sendReply: timeout waiting for listener " ++ listener
+      return null
+    )
     wait 0.1
+    attempts = attempts + 1
   )
+
   return getListenedMessage(listener)
 )
 
@@ -219,8 +267,17 @@ def editMessage(*Connection c, object msg, string content) object (
     content: content,
     listener: listener
   })
+
+  number attempts = 0
+  number maxAttempts = 100
   while !recent_message_listeners.contains(listener) (
+    if attempts >= maxAttempts (
+      log "editMessage: timeout waiting for listener " ++ listener
+      return null
+    )
     wait 0.1
+    attempts = attempts + 1
   )
+
   return getListenedMessage(listener)
 )
