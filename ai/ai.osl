@@ -141,7 +141,7 @@ def fetchChannelHistory(*Connection c, string channel_id, number limit) string (
       if !att_url.startsWith("https://") (
         continue
       )
-      attachment_suffix = " (with attachment: " ++ att_url ++ ", size: " ++ att.size.toStr() ++ ", name: " ++ att.name.toStr() ++ ", mime: " ++ att.mime_type.toStr() ++ ")"
+      attachment_suffix ++= " (with attachment: " ++ att_url ++ ", size: " ++ att.size.toStr() ++ ", name: " ++ att.name.toStr() ++ ", mime: " ++ att.mime_type.toStr() ++ ")"
     )
     
     history += username ++ " said \"" ++ content ++ "\"" ++ reply_suffix ++ attachment_suffix ++ "\n"
