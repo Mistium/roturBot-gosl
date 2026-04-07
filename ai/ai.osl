@@ -34,7 +34,7 @@ def handleAIQuery(*Connection c, object msg, string server_url) (
 
   array messages = buildAIMessages(user_data.user.assert(object), content, personality, channel_id, c, server_url)
 
-  object response = queryAIWithTools(c, channel_id, messages, tier, 0, server_url)
+  object response = queryAIWithToolsInternal(c, reply_msg, "", channel_id, messages, tier, 0, server_url)
 
   if response.error != null (
     editMessage(c, reply_msg, "Sorry, I encountered an error: " ++ response.error.toStr())
@@ -127,8 +127,24 @@ def fetchChannelHistory(*Connection c, string channel_id, number limit) string (
         )
       )
     )
+
+    string attachment_suffix = ""
+
+    // .len returns 0 for null and [] so this works for servers without attachments
+    for i msg.attachments.len (
+      any att_raw = msg.attachments[i]
+      if att_raw == null or typeof(att_raw) != "object" (
+        continue
+      )
+      object att = att_raw.assert(object)
+      string att_url = (att.url ?? "").toStr()
+      if !att_url.startsWith("https://") (
+        continue
+      )
+      attachment_suffix = " (with attachment: " ++ att_url ++ ", size: " ++ att.size.toStr() ++ ", name: " ++ att.name.toStr() ++ ", mime: " ++ att.mime_type.toStr() ++ ")"
+    )
     
-    history += username ++ " said \"" ++ content ++ "\"" ++ reply_suffix ++ "\n"
+    history += username ++ " said \"" ++ content ++ "\"" ++ reply_suffix ++ attachment_suffix ++ "\n"
   )
   
   return history
@@ -143,7 +159,6 @@ def buildAIMessages(object user, string prompt, string personality, string chann
   })
 
   string user_context = "You are talking to the rotur user named: " ++ (user.username ?? "someone")
-  user_context ++= ". On discord they are " ++ (user.discord_id ?? "unknown")
   user_context ++= " with display name: " ++ (user.display_name ?? user.username ?? "unknown")
   user_context ++= ". You are chatting in " ++ channel_id ++ "."
   user_context ++= " Channel ID: " ++ channel_id ++ " - Use this channel_id for save_memory and search_memories tool calls."
@@ -163,7 +178,7 @@ def buildAIMessages(object user, string prompt, string personality, string chann
   )
 
   // Inject relationship thoughts for this user
-  string user_id = (user.discord_id ?? user.username ?? "").toStr()
+  string user_id = (user.username ?? "").toStr()
   string relationship_thoughts = getFormattedThoughts(user_id)
   if relationship_thoughts.len > 0 (
     messages.append({
@@ -242,6 +257,10 @@ def buildAIMessages(object user, string prompt, string personality, string chann
 )
 
 def queryAIWithTools(*Connection c, string channel_id, array messages, string tier, number depth, string server_url) object (
+  return queryAIWithToolsInternal(c, null, "", channel_id, messages, tier, depth, server_url)
+)
+
+def queryAIWithToolsInternal(*Connection c, object reply_msg, string tool_status, string channel_id, array messages, string tier, number depth, string server_url) object (
   array ai_tools = openArrayFile("./ai/tools.json")
   object response = queryAI(messages, tier, true, ai_tools)
 
@@ -305,6 +324,16 @@ def queryAIWithTools(*Connection c, string channel_id, array messages, string ti
         args = args_parsed.assert(object)
       )
 
+      if reply_msg != null (
+        string tool_display = formatToolDisplay(func_name, args)
+        string new_status = tool_status
+        if new_status.len > 0 (
+          new_status ++= "\n"
+        )
+        new_status ++= tool_display
+        editMessage(c, reply_msg, new_status)
+      )
+
       string tool_result = callTool(c, func_name, args, channel_id, server_url)
 
       if tool_result == "__SILENT_EXIT__" (
@@ -319,7 +348,7 @@ def queryAIWithTools(*Connection c, string channel_id, array messages, string ti
       messages.append(tool_msg)
     )
 
-    return queryAIWithTools(c, channel_id, messages, tier, depth + 1, server_url)
+    return queryAIWithToolsInternal(c, reply_msg, tool_status, channel_id, messages, tier, depth + 1, server_url)
   )
 
   return response
@@ -360,15 +389,21 @@ def formatToolDisplay(string func_name, object args) string (
     display = "updating relationship thoughts..."
   ) else if func_name == "modify_emotional_state" and args.contains("action") (
     display = "updating emotional state (" ++ args.action.toStr() ++ ")..."
-    ) else if func_name == "calculate" and args.contains("expression") (
-      display = "calculating: " ++ args.expression.toStr()
-    ) else if func_name == "search_messages" and args.contains("query") (
-      display = "searching messages: \"" ++ args.query.toStr() ++ "\""
-    ) else if func_name == "silent_exit" (
-      display = "silent exit..."
-    ) else if func_name == "make_web_request" and args.contains("url") (
-      display = "requesting: " ++ args.url.toStr()
-    )
+  ) else if func_name == "calculate" and args.contains("expression") (
+    display = "calculating: " ++ args.expression.toStr()
+  ) else if func_name == "search_messages" and args.contains("query") (
+    display = "searching messages: \"" ++ args.query.toStr() ++ "\""
+  ) else if func_name == "silent_exit" (
+    display = "silent exit..."
+  ) else if func_name == "make_web_request" and args.contains("url") (
+    display = "requesting: " ++ args.url.toStr()
+  ) else if func_name == "add_reaction" and args.contains("emoji") (
+    display = "reacting with " ++ args.emoji.toStr()
+  ) else if func_name == "get_weather" and args.contains("location") (
+    display = "getting weather for: " ++ args.location.toStr()
+  ) else if func_name == "search_wikipedia" and args.contains("query") (
+    display = "searching wikipedia: \"" ++ args.query.toStr() ++ "\""
+  )
 
   return "Calling " ++ display
 )
@@ -598,11 +633,133 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
       
       return { results: results, formatted: formatted }.toStr()
 
-    case "silent_exit"
-      return "__SILENT_EXIT__"
-  )
+      case "silent_exit"
+        return "__SILENT_EXIT__"
 
-  return { error: "Unknown tool: " ++ name }.toStr()
+      case "add_reaction"
+        string emoji = (args.emoji ?? "").toStr()
+        if emoji.len == 0 (
+          return { error: "emoji is required" }.toStr()
+        )
+        c.Send({
+          cmd: "reaction_add",
+          channel: channel_id,
+          emoji: emoji
+        })
+        return { success: true, emoji: emoji }.toStr()
+
+      case "get_weather"
+        string location = (args.location ?? "").toStr()
+        string units = (args.units ?? "celsius").toStr()
+        if location.len == 0 (
+          return { error: "location is required" }.toStr()
+        )
+        object weather_resp = requests.Get("https://wttr.in/" ++ encodeURIComponent(location) ++ "?format=j1")
+        if !weather_resp.success (
+          return { error: "Failed to get weather data" }.toStr()
+        )
+        any weather_parsed = weather_resp.body.toStr().JsonParse()
+        if typeof(weather_parsed) != "object" (
+          return { error: "Invalid weather response" }.toStr()
+        )
+        object weather_data = weather_parsed
+        array current_arr = (weather_data.current_condition ?? [])
+        object current = {}
+        if current_arr.len > 0 (
+          current = current_arr[1]
+        )
+        string temp_c = (current.temp_C ?? "?").toStr()
+        string temp_f = (current.temp_F ?? "?").toStr()
+        array desc_arr = (current.weatherDesc ?? [])
+        string desc = "Unknown"
+        if desc_arr.len > 0 (
+          desc = (desc_arr[1].value ?? "Unknown").toStr()
+        )
+        string temp = temp_c
+        if units == "fahrenheit" (
+          temp = temp_f
+        )
+        array area_arr = (weather_data.nearest_area ?? [])
+        object area = {}
+        if area_arr.len > 0 (
+          area = area_arr[1]
+        )
+        array area_name_arr = (area.areaName ?? [])
+        string area_name = location
+        if area_name_arr.len > 0 (
+          area_name = (area_name_arr[1].value ?? location).toStr()
+        )
+        return {
+          location: area_name,
+          temperature: temp,
+          unit: units == "fahrenheit" ? "F" : "C",
+          description: desc,
+          humidity: (current.humidity ?? "?").toStr(),
+          wind: (current.windspeedKmph ?? "?").toStr() ++ " km/h"
+        }.toStr()
+
+      case "search_wikipedia"
+        string wiki_query = (args.query ?? "").toStr()
+        number wiki_sentences = (args.sentences ?? 3).toNum()
+        if wiki_query.len == 0 (
+          return { error: "query is required" }.toStr()
+        )
+        object wiki_resp = requests.Get("https://en.wikipedia.org/api/rest_v1/page/summary/" ++ encodeURIComponent(wiki_query))
+        if !wiki_resp.success (
+          return { error: "Wikipedia search failed" }.toStr()
+        )
+        any wiki_parsed = wiki_resp.body.toStr().JsonParse()
+        if typeof(wiki_parsed) != "object" (
+          return { error: "Invalid Wikipedia response" }.toStr()
+        )
+        object wiki_data = wiki_parsed
+        if wiki_data.type == "disambiguation" (
+          return { 
+            error: "Multiple results found. Try a more specific query.",
+            suggestions: wiki_data.content_urls
+          }.toStr()
+        )
+        string wiki_extract = (wiki_data.extract ?? "").toStr()
+        if wiki_sentences > 0 and wiki_extract.len > 0 (
+          array sentences_arr = wiki_extract.split(". ")
+          string limited_extract = ""
+          number sent_count = 0
+          for i sentences_arr.len (
+            if sent_count >= wiki_sentences (
+              break
+            )
+            if limited_extract.len > 0 (
+              limited_extract ++= ". "
+            )
+            limited_extract ++= sentences_arr[i].toStr()
+            sent_count += 1
+          )
+          wiki_extract = limited_extract
+        )
+        string wiki_url = "https://en.wikipedia.org/wiki/" ++ encodeURIComponent(wiki_query)
+        if wiki_data.contains("content_urls") (
+          any cu_raw = wiki_data.content_urls
+          if typeof(cu_raw) == "object" (
+            object content_urls = cu_raw
+            if content_urls.contains("desktop") (
+              any desktop_raw = content_urls.desktop
+              if typeof(desktop_raw) == "object" (
+                object desktop = desktop_raw
+                if desktop.contains("page") (
+                  wiki_url = desktop.page.toStr()
+                )
+              )
+            )
+          )
+        )
+        return {
+          title: wiki_data.title ?? wiki_query,
+          extract: wiki_extract,
+          url: wiki_url
+        }.toStr()
+    )
+
+    return { error: "Unknown tool: " ++ name }.toStr()
 )
 
 def processResponse(*Connection c, object reply_msg, object response, string tier) (

@@ -458,5 +458,65 @@
         "properties": {}
       }
     }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "add_reaction",
+      "description": "Add an emoji reaction to a message. Use this to acknowledge or respond to messages without text.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "description": "The emoji to react with. Can be a unicode emoji like 👍 or a custom emoji name."
+          }
+        },
+        "required": ["emoji"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_weather",
+      "description": "Get current weather information for a location.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "City name, coordinates, or location. Examples: 'London', '40.7128,-74.0060', 'Paris, France'"
+          },
+          "units": {
+            "type": "string",
+            "enum": ["celsius", "fahrenheit"],
+            "description": "Temperature units. Default: celsius"
+          }
+        },
+        "required": ["location"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "search_wikipedia",
+      "description": "Search Wikipedia for information on any topic. Returns a summary and link to the article.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The topic to search for on Wikipedia"
+          },
+          "sentences": {
+            "type": "integer",
+            "description": "Number of sentences to return in summary. Default: 3"
+          }
+        },
+        "required": ["query"]
+      }
+    }
   }
 ]
