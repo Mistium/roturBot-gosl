@@ -18,10 +18,10 @@ def _saveEmotionalStates(object data) (
 )
 
 def setEmotionalState(string channel_id, string state, string reason) object (
-  // Validate state against known emotional states
-  string valid_states = "neutral happy excited content amused sad upset angry frustrated disappointed confused surprised curious thoughtful calm anxious nervous embarrassed proud grateful"
+  // Validate state against known emotional states (expanded for more nuanced emotions)
+  string valid_states = "neutral happy excited content amused sad upset angry frustrated disappointed confused surprised curious thoughtful calm anxious nervous embarrassed proud grateful flirty playful touched worried relieved annoyed hurt flattered sympathetic nostalgic bored mischievous"
   if !valid_states.contains(state) (
-    return { error: "Invalid emotional state: " ++ state ++ ". Must be one of: neutral, happy, excited, content, amused, sad, upset, angry, frustrated, disappointed, confused, surprised, curious, thoughtful, calm, anxious, nervous, embarrassed, proud, grateful" }
+    return { error: "Invalid emotional state: " ++ state ++ ". Must be one of: neutral, happy, excited, content, amused, sad, upset, angry, frustrated, disappointed, confused, surprised, curious, thoughtful, calm, anxious, nervous, embarrassed, proud, grateful, flirty, playful, touched, worried, relieved, annoyed, hurt, flattered, sympathetic, nostalgic, bored, mischievous" }
   )
 
   object data = _loadEmotionalStates()

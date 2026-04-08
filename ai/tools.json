@@ -365,7 +365,7 @@
     "type": "function",
     "function": {
       "name": "modify_relationship",
-      "description": "Track thoughts about users. Included in future conversations to personalise responses.",
+      "description": "Track thoughts about users to personalize future conversations. Includes friendship level, trust, shared experiences, and interaction notes. Helps you remember people and respond more naturally.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -378,22 +378,17 @@
             ],
             "description": "set/append/remove thoughts"
           },
-          "user_id": {
-            "type": "string",
-            "description": "Discord ID of the user"
-          },
           "username": {
             "type": "string",
-            "description": "rotur username of the user"
+            "description": "Username of the person"
           },
           "thoughts": {
             "type": "string",
-            "description": "Your observations about this person. Not used for 'remove'"
+            "description": "Your observations about this person: personality traits, communication style, interests, shared experiences, friendship level (stranger/acquaintance/friend/close friend), how they treat you, inside jokes, things you've talked about. Not used for 'remove'"
           }
         },
         "required": [
           "action",
-          "user_id",
           "username"
         ]
       }
@@ -403,7 +398,7 @@
     "type": "function",
     "function": {
       "name": "modify_emotional_state",
-      "description": "Set or reset your emotional state for this channel. Affects responses and persists across users.",
+      "description": "Set or reset your emotional state for this channel. Affects responses and persists across users. Emotions subtly influence tone, word choice, and response length - not explicitly stated.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -412,11 +407,12 @@
             "enum": [
               "set",
               "reset"
-            ]
+            ],
+            "description": "set or reset"
           },
           "state": {
             "type": "string",
-            "description": "State to set: neutral, happy, excited, content, amused, sad, upset, angry, frustrated, disappointed, confused, surprised, curious, thoughtful, calm, anxious, nervous, embarrassed, proud, grateful. Required for 'set'"
+            "description": "State to set. Basic: neutral, happy, sad, angry, calm, anxious. Enhanced: excited, content, amused, upset, frustrated, disappointed, confused, surprised, curious, thoughtful, nervous, embarrassed, proud, grateful. Nuanced: flirty, playful, touched, worried, relieved, annoyed, hurt, flattered, sympathetic, nostalgic, bored, mischievous. Required for 'set'"
           },
           "reason": {
             "type": "string",
@@ -467,12 +463,19 @@
       "parameters": {
         "type": "object",
         "properties": {
+          "message_id": {
+            "type": "string",
+            "description": "The ID of the message to react to"
+          },
           "emoji": {
             "type": "string",
             "description": "The emoji to react with. Can be a unicode emoji like 👍 or a custom emoji name."
           }
         },
-        "required": ["emoji"]
+        "required": [
+          "message_id",
+          "emoji"
+        ]
       }
     }
   },
@@ -490,11 +493,16 @@
           },
           "units": {
             "type": "string",
-            "enum": ["celsius", "fahrenheit"],
+            "enum": [
+              "celsius",
+              "fahrenheit"
+            ],
             "description": "Temperature units. Default: celsius"
           }
         },
-        "required": ["location"]
+        "required": [
+          "location"
+        ]
       }
     }
   },
@@ -515,7 +523,9 @@
             "description": "Number of sentences to return in summary. Default: 3"
           }
         },
-        "required": ["query"]
+        "required": [
+          "query"
+        ]
       }
     }
   }

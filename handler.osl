@@ -5,7 +5,9 @@ def messageHandler(*Connection c, string message) (
   )
   object json = json_raw.assert(object)
   if json.listener != null (
+    lock.Lock(RECENT_LISTENED_LOCK)
     recent_listened_messages[json.listener] = json
+    lock.Unlock(RECENT_LISTENED_LOCK)
     recent_message_listeners.append(json.listener)
     if recent_message_listeners.len > 1000 (
       recent_message_listeners.shift()
@@ -74,11 +76,13 @@ def messageHandler(*Connection c, string message) (
 )
 
 def getListenedMessage(string listener) object (
+  lock.Lock(RECENT_LISTENED_LOCK)
   if !recent_listened_messages.contains(listener) (
     return null
   )
   object data = recent_listened_messages[listener]
   recent_listened_messages.delete(listener)
+  lock.Unlock(RECENT_LISTENED_LOCK)
   return rawToMsg(data)
 )
 

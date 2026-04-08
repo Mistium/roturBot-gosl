@@ -44,14 +44,14 @@ def handleAIQuery(*Connection c, object msg, string server_url) (
   processResponse(c, reply_msg, response, tier)
 )
 
-def validateUser(string discord_id) object (
-  object user = getUserProfile(discord_id)
+def validateUser(string user_identifier) object (
+  object user = getUserProfile(user_identifier)
 
   if user.error != null (
     return { error: user.error.toStr() }
   )
 
-  object full_user = getUserData(user.username ?? discord_id)
+  object full_user = getUserData(user.username ?? user_identifier)
 
   if full_user.error != null (
     return { error: full_user.error.toStr() }
@@ -71,23 +71,31 @@ def fetchChannelHistory(*Connection c, string channel_id, number limit) string (
   c.Send({
     cmd: "messages_get",
     channel: channel_id,
-    limit: limit,
+    limit: limit + 2,
     listener: listener
   })
   
-  while !recent_listened_messages.contains(listener) (
+  while true (
+    lock.Lock(RECENT_LISTENED_LOCK)
+    boolean has_listener = recent_listened_messages.contains(listener)
+    lock.Unlock(RECENT_LISTENED_LOCK)
+    if has_listener (
+      break
+    )
     wait 0.1
   )
   
+  lock.Lock(RECENT_LISTENED_LOCK)
   object data = recent_listened_messages[listener].assert(object)
   recent_listened_messages.delete(listener)
+  lock.Unlock(RECENT_LISTENED_LOCK)
   
   any messages_raw = data.messages
   if typeof(messages_raw) != "array" (
     return ""
   )
   
-  array messages = messages_raw.assert(array)
+  array messages = messages_raw.assert(array).trim(1, -3)
   
   if messages.len == 0 (
     return ""
@@ -143,8 +151,14 @@ def fetchChannelHistory(*Connection c, string channel_id, number limit) string (
       )
       attachment_suffix ++= " (with attachment: " ++ att_url ++ ", size: " ++ att.size.toStr() ++ ", name: " ++ att.name.toStr() ++ ", mime: " ++ att.mime_type.toStr() ++ ")"
     )
+
+    string reaction_suffix = ""
+
+    if typeof(msg.reactions) == "object" (
+      reaction_suffix = " (with reactions: " ++ msg.reactions.toStr() ++ ")"
+    )
     
-    history += username ++ " said \"" ++ content ++ "\"" ++ reply_suffix ++ attachment_suffix ++ "\n"
+    history += username ++ " said \"" ++ content ++ "\"" ++ reply_suffix ++ attachment_suffix ++ reaction_suffix ++ "(message_id: " ++ msg.id.toStr() ++ ")\n"
   )
   
   return history
@@ -178,8 +192,8 @@ def buildAIMessages(object user, string prompt, string personality, string chann
   )
 
   // Inject relationship thoughts for this user
-  string user_id = (user.username ?? "").toStr()
-  string relationship_thoughts = getFormattedThoughts(user_id)
+  string rel_username = (user.username ?? "").toStr()
+  string relationship_thoughts = getFormattedThoughts(rel_username)
   if relationship_thoughts.len > 0 (
     messages.append({
       role: "assistant",
@@ -193,8 +207,8 @@ def buildAIMessages(object user, string prompt, string personality, string chann
   if username.len > 0 (
     tags_filter.append("user:" ++ username)
   )
-  array user_memories = searchMemories(server_url, "user:" ++ username, tags_filter, 1, 5)
-  array general_memories = searchMemories(server_url, prompt, [], 7, 8)
+  array user_memories = searchMemories(encodeURIComponent(server_url), "user:" ++ username, tags_filter, 1, 5)
+  array general_memories = searchMemories(encodeURIComponent(server_url), prompt, [], 7, 8)
 
   // Combine without duplicates
   array all_memories = []
@@ -540,7 +554,7 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
       )
       number mem_importance = (args.importance ?? 5).toNum()
       number mem_ttl = (args.ttl_days ?? 30).toNum()
-      object save_result = saveMemory(server_url, mem_content, mem_tags, mem_importance, mem_ttl)
+      object save_result = saveMemory(encodeURIComponent(server_url), mem_content, mem_tags, mem_importance, mem_ttl)
       return save_result.toStr()
 
     case "search_memories"
@@ -552,7 +566,7 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
       )
       number search_min_imp = (args.min_importance ?? 1).toNum()
       number search_limit = (args.limit ?? 5).toNum()
-      array search_results = searchMemories(server_url, search_query, search_tags, search_min_imp, search_limit)
+      array search_results = searchMemories(encodeURIComponent(server_url), search_query, search_tags, search_min_imp, search_limit)
       return search_results.toStr()
 
     case "update_memory"
@@ -560,15 +574,14 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
       string update_action = (args.action ?? "").toStr()
       number update_ttl = (args.new_ttl_days ?? 30).toNum()
       number update_boost = (args.importance_boost ?? 1).toNum()
-      object update_result = updateMemory(server_url, update_id, update_action, update_ttl, update_boost)
+      object update_result = updateMemory(encodeURIComponent(server_url), update_id, update_action, update_ttl, update_boost)
       return update_result.toStr()
 
     case "modify_relationship"
       string rel_action = (args.action ?? "").toStr()
-      string rel_user_id = (args.user_id ?? "").toStr()
       string rel_username = (args.username ?? "").toStr()
       string rel_thoughts = (args.thoughts ?? "").toStr()
-      object rel_result = modifyRelationship(rel_action, rel_user_id, rel_username, rel_thoughts)
+      object rel_result = modifyRelationship(rel_action, rel_username, rel_thoughts)
       return rel_result.toStr()
 
     case "modify_emotional_state"
@@ -600,12 +613,20 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
         listener: search_listener
       })
       
-      while !recent_listened_messages.contains(search_listener) (
+      while true (
+        lock.Lock(RECENT_LISTENED_LOCK)
+        boolean has_listener = recent_listened_messages.contains(search_listener)
+        lock.Unlock(RECENT_LISTENED_LOCK)
+        if has_listener (
+          break
+        )
         wait 0.1
       )
       
+      lock.Lock(RECENT_LISTENED_LOCK)
       object search_data = recent_listened_messages[search_listener].assert(object)
       recent_listened_messages.delete(search_listener)
+      lock.Unlock(RECENT_LISTENED_LOCK)
       
       any results_raw = search_data.results
       if typeof(results_raw) != "array" (
@@ -633,130 +654,130 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
       
       return { results: results, formatted: formatted }.toStr()
 
-      case "silent_exit"
-        return "__SILENT_EXIT__"
+    case "silent_exit"
+      return "__SILENT_EXIT__"
 
-      case "add_reaction"
-        string emoji = (args.emoji ?? "").toStr()
-        if emoji.len == 0 (
-          return { error: "emoji is required" }.toStr()
-        )
-        c.Send({
-          cmd: "reaction_add",
-          channel: channel_id,
-          emoji: emoji
-        })
-        return { success: true, emoji: emoji }.toStr()
+    case "add_reaction"
+      string emoji = args.emoji.toStr()
+      if emoji.len == 0 (
+        return { error: "emoji is required" }.toStr()
+      )
+      string message_id = args.message_id.toStr()
+      if message_id.len == 0 (
+        return { error: "message id is required" }.toStr()
+      )
+      reactToMessage(c, channel_id, message_id, emoji)
+      return { success: true, emoji: emoji }.toStr()
 
-      case "get_weather"
-        string location = (args.location ?? "").toStr()
-        string units = (args.units ?? "celsius").toStr()
-        if location.len == 0 (
-          return { error: "location is required" }.toStr()
-        )
-        object weather_resp = requests.Get("https://wttr.in/" ++ encodeURIComponent(location) ++ "?format=j1")
-        if !weather_resp.success (
-          return { error: "Failed to get weather data" }.toStr()
-        )
-        any weather_parsed = weather_resp.body.toStr().JsonParse()
-        if typeof(weather_parsed) != "object" (
-          return { error: "Invalid weather response" }.toStr()
-        )
-        object weather_data = weather_parsed
-        array current_arr = (weather_data.current_condition ?? [])
-        object current = {}
-        if current_arr.len > 0 (
-          current = current_arr[1]
-        )
-        string temp_c = (current.temp_C ?? "?").toStr()
-        string temp_f = (current.temp_F ?? "?").toStr()
-        array desc_arr = (current.weatherDesc ?? [])
-        string desc = "Unknown"
-        if desc_arr.len > 0 (
-          desc = (desc_arr[1].value ?? "Unknown").toStr()
-        )
-        string temp = temp_c
-        if units == "fahrenheit" (
-          temp = temp_f
-        )
-        array area_arr = (weather_data.nearest_area ?? [])
-        object area = {}
-        if area_arr.len > 0 (
-          area = area_arr[1]
-        )
-        array area_name_arr = (area.areaName ?? [])
-        string area_name = location
-        if area_name_arr.len > 0 (
-          area_name = (area_name_arr[1].value ?? location).toStr()
-        )
-        return {
-          location: area_name,
-          temperature: temp,
-          unit: units == "fahrenheit" ? "F" : "C",
-          description: desc,
-          humidity: (current.humidity ?? "?").toStr(),
-          wind: (current.windspeedKmph ?? "?").toStr() ++ " km/h"
+    case "get_weather"
+      string location = (args.location ?? "").toStr()
+      string units = (args.units ?? "celsius").toStr()
+      if location.len == 0 (
+        return { error: "location is required" }.toStr()
+      )
+      object weather_resp = requests.Get("https://wttr.in/" ++ encodeURIComponent(location) ++ "?format=j1")
+      if !weather_resp.success (
+        return { error: "Failed to get weather data" }.toStr()
+      )
+      any weather_parsed = weather_resp.body.toStr().JsonParse()
+      if typeof(weather_parsed) != "object" (
+        return { error: "Invalid weather response" }.toStr()
+      )
+      object weather_data = weather_parsed
+      array current_arr = (weather_data.current_condition ?? [])
+      object current = {}
+      if current_arr.len > 0 (
+        current = current_arr[1]
+      )
+      string temp_c = (current.temp_C ?? "?").toStr()
+      string temp_f = (current.temp_F ?? "?").toStr()
+      array desc_arr = (current.weatherDesc ?? [])
+      string desc = "Unknown"
+      if desc_arr.len > 0 (
+        desc = (desc_arr[1].value ?? "Unknown").toStr()
+      )
+      string temp = temp_c
+      if units == "fahrenheit" (
+        temp = temp_f
+      )
+      array area_arr = (weather_data.nearest_area ?? [])
+      object area = {}
+      if area_arr.len > 0 (
+        area = area_arr[1]
+      )
+      array area_name_arr = (area.areaName ?? [])
+      string area_name = location
+      if area_name_arr.len > 0 (
+        area_name = (area_name_arr[1].value ?? location).toStr()
+      )
+      return {
+        location: area_name,
+        temperature: temp,
+        unit: units == "fahrenheit" ? "F" : "C",
+        description: desc,
+        humidity: (current.humidity ?? "?").toStr(),
+        wind: (current.windspeedKmph ?? "?").toStr() ++ " km/h"
+      }.toStr()
+
+    case "search_wikipedia"
+      string wiki_query = (args.query ?? "").toStr()
+      number wiki_sentences = (args.sentences ?? 3).toNum()
+      if wiki_query.len == 0 (
+        return { error: "query is required" }.toStr()
+      )
+      object wiki_resp = requests.Get("https://en.wikipedia.org/api/rest_v1/page/summary/" ++ encodeURIComponent(wiki_query))
+      if !wiki_resp.success (
+        return { error: "Wikipedia search failed" }.toStr()
+      )
+      any wiki_parsed = wiki_resp.body.toStr().JsonParse()
+      if typeof(wiki_parsed) != "object" (
+        return { error: "Invalid Wikipedia response" }.toStr()
+      )
+      object wiki_data = wiki_parsed
+      if wiki_data.type == "disambiguation" (
+        return { 
+          error: "Multiple results found. Try a more specific query.",
+          suggestions: wiki_data.content_urls
         }.toStr()
-
-      case "search_wikipedia"
-        string wiki_query = (args.query ?? "").toStr()
-        number wiki_sentences = (args.sentences ?? 3).toNum()
-        if wiki_query.len == 0 (
-          return { error: "query is required" }.toStr()
-        )
-        object wiki_resp = requests.Get("https://en.wikipedia.org/api/rest_v1/page/summary/" ++ encodeURIComponent(wiki_query))
-        if !wiki_resp.success (
-          return { error: "Wikipedia search failed" }.toStr()
-        )
-        any wiki_parsed = wiki_resp.body.toStr().JsonParse()
-        if typeof(wiki_parsed) != "object" (
-          return { error: "Invalid Wikipedia response" }.toStr()
-        )
-        object wiki_data = wiki_parsed
-        if wiki_data.type == "disambiguation" (
-          return { 
-            error: "Multiple results found. Try a more specific query.",
-            suggestions: wiki_data.content_urls
-          }.toStr()
-        )
-        string wiki_extract = (wiki_data.extract ?? "").toStr()
-        if wiki_sentences > 0 and wiki_extract.len > 0 (
-          array sentences_arr = wiki_extract.split(". ")
-          string limited_extract = ""
-          number sent_count = 0
-          for i sentences_arr.len (
-            if sent_count >= wiki_sentences (
-              break
-            )
-            if limited_extract.len > 0 (
-              limited_extract ++= ". "
-            )
-            limited_extract ++= sentences_arr[i].toStr()
-            sent_count += 1
+      )
+      string wiki_extract = (wiki_data.extract ?? "").toStr()
+      if wiki_sentences > 0 and wiki_extract.len > 0 (
+        array sentences_arr = wiki_extract.split(". ")
+        string limited_extract = ""
+        number sent_count = 0
+        for i sentences_arr.len (
+          if sent_count >= wiki_sentences (
+            break
           )
-          wiki_extract = limited_extract
+          if limited_extract.len > 0 (
+            limited_extract ++= ". "
+          )
+          limited_extract ++= sentences_arr[i].toStr()
+          sent_count += 1
         )
-        string wiki_url = "https://en.wikipedia.org/wiki/" ++ encodeURIComponent(wiki_query)
-        if wiki_data.contains("content_urls") (
-          any cu_raw = wiki_data.content_urls
-          if typeof(cu_raw) == "object" (
-            object content_urls = cu_raw
-            if content_urls.contains("desktop") (
-              any desktop_raw = content_urls.desktop
-              if typeof(desktop_raw) == "object" (
-                object desktop = desktop_raw
-                if desktop.contains("page") (
-                  wiki_url = desktop.page.toStr()
-                )
+        wiki_extract = limited_extract
+      )
+      string wiki_url = "https://en.wikipedia.org/wiki/" ++ encodeURIComponent(wiki_query)
+      if wiki_data.contains("content_urls") (
+        any cu_raw = wiki_data.content_urls
+        if typeof(cu_raw) == "object" (
+          object content_urls = cu_raw
+          if content_urls.contains("desktop") (
+            any desktop_raw = content_urls.desktop
+            if typeof(desktop_raw) == "object" (
+              object desktop = desktop_raw
+              if desktop.contains("page") (
+                wiki_url = desktop.page.toStr()
               )
             )
           )
         )
-        return {
-          title: wiki_data.title ?? wiki_query,
-          extract: wiki_extract,
-          url: wiki_url
-        }.toStr()
+      )
+      return {
+        title: wiki_data.title ?? wiki_query,
+        extract: wiki_extract,
+        url: wiki_url
+      }.toStr()
     )
 
     return { error: "Unknown tool: " ++ name }.toStr()

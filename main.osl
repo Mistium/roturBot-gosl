@@ -65,6 +65,8 @@ array ACTIVITY_THRESHOLDS = [
 
 array ACTIVITY_ROLE_NAMES = ["Active 100+", "Active 500+", "Active 1000+", "Active 3000+"]
 
+string RECENT_LISTENED_LOCK = "recent_listened_messages"
+
 import "./ai/ai.osl"
 import "./ai/vercel.osl"
 import "./ai/personalities.osl"

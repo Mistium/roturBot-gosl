@@ -24,8 +24,10 @@ def _loadMemories(string server_id) array (
 )
 
 def _saveMemories(string server_id, array memories) (
+  fs.Mkdir("./store/memories")
   string path = _getMemoryFile(server_id)
   object data = { memories: memories }
+  log path ++ data.toStr()
   fs.WriteFile(path, data.toStr())
 )
 

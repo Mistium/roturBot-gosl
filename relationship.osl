@@ -1,5 +1,6 @@
 // Relationship System for roturbot-gosl
-// Manages roturbot's thoughts about specific rotur users, persisted to ./store/relationships.json
+// Manages thoughts about specific users, persisted to ./store/relationships.json
+// Uses username as the identifier (originChats doesn't have separate user IDs)
 
 def _loadRelationships() object (
   string data = fs.ReadFile("./store/relationships.json")
@@ -17,30 +18,30 @@ def _saveRelationships(object data) (
   fs.WriteFile("./store/relationships.json", data.toStr())
 )
 
-def setThoughts(string user_id, string username, string thoughts) object (
+def setThoughts(string username, string thoughts) object (
   object data = _loadRelationships()
-  data[user_id] = {
+  data[username] = {
     username: username,
     thoughts: thoughts,
     last_updated: timestamp
   }
   _saveRelationships(data)
-  return { success: true, user_id: user_id, username: username, thoughts: thoughts }
+  return { success: true, username: username, thoughts: thoughts }
 )
 
-def getThoughts(string user_id) object (
+def getThoughts(string username) object (
   object data = _loadRelationships()
-  if data.contains(user_id) (
-    return data[user_id].assert(object)
+  if data.contains(username) (
+    return data[username].assert(object)
   )
   return null
 )
 
-def appendThoughts(string user_id, string username, string additional_thoughts) object (
+def appendThoughts(string username, string additional_thoughts) object (
   object data = _loadRelationships()
   string existing_thoughts = ""
-  if data.contains(user_id) (
-    object existing = data[user_id].assert(object)
+  if data.contains(username) (
+    object existing = data[username].assert(object)
     existing_thoughts = (existing.thoughts ?? "").toStr()
   )
   string combined = existing_thoughts
@@ -49,40 +50,40 @@ def appendThoughts(string user_id, string username, string additional_thoughts) 
   ) else (
     combined = additional_thoughts
   )
-  data[user_id] = {
+  data[username] = {
     username: username,
     thoughts: combined,
     last_updated: timestamp
   }
   _saveRelationships(data)
-  return { success: true, user_id: user_id, username: username, thoughts: combined }
+  return { success: true, username: username, thoughts: combined }
 )
 
-def removeThoughts(string user_id) object (
+def removeThoughts(string username) object (
   object data = _loadRelationships()
-  if data.contains(user_id) (
-    data.delete(user_id)
+  if data.contains(username) (
+    data.delete(username)
     _saveRelationships(data)
-    return { success: true, user_id: user_id, message: "Thoughts removed" }
+    return { success: true, username: username, message: "Thoughts removed" }
   )
-  return { success: false, user_id: user_id, message: "No thoughts found for this user" }
+  return { success: false, username: username, message: "No thoughts found for this user" }
 )
 
-def modifyRelationship(string action, string user_id, string username, string thoughts) object (
+def modifyRelationship(string action, string username, string thoughts) object (
   if action == "set" (
-    return setThoughts(user_id, username, thoughts)
+    return setThoughts(username, thoughts)
   )
   if action == "append" (
-    return appendThoughts(user_id, username, thoughts)
+    return appendThoughts(username, thoughts)
   )
   if action == "remove" (
-    return removeThoughts(user_id)
+    return removeThoughts(username)
   )
   return { error: "Invalid action: " ++ action ++ ". Use set, append, or remove." }
 )
 
-def getFormattedThoughts(string user_id) string (
-  any rel = getThoughts(user_id)
+def getFormattedThoughts(string username) string (
+  any rel = getThoughts(username)
   if typeof(rel) != "object" (
     return ""
   )
