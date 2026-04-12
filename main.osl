@@ -16,6 +16,10 @@ object slash_schemas = {}
 object channel_messages = {}
 object user_personalities = {}
 
+object CHANNEL_MESSAGE_CACHE = {}
+number CHANNEL_CACHE_MAX_SIZE = 50
+string CHANNEL_CACHE_LOCK = "channel_message_cache"
+
 object token_cache = {}
 object pending_reactions = {}
 string connect_url = ""
@@ -67,6 +71,15 @@ array ACTIVITY_ROLE_NAMES = ["Active 100+", "Active 500+", "Active 1000+", "Acti
 
 string RECENT_LISTENED_LOCK = "recent_listened_messages"
 
+string SANDBOX_SERVICE_URL = config["sandbox-service-url"] ?? "http://localhost:3100"
+string SANDBOX_API_KEY = config["sandbox-api-key"] ?? "roturbot-sandbox-key"
+
+object SANDBOX_HEADERS = {
+  "Authorization": "Bearer " ++ SANDBOX_API_KEY,
+  "Content-Type": "application/json"
+}
+
+import "./channel_cache.osl"
 import "./ai/ai.osl"
 import "./ai/vercel.osl"
 import "./ai/personalities.osl"
@@ -83,6 +96,7 @@ import "./message_tracker.osl"
 import "./activity_roles.osl"
 import "./emotional_state.osl"
 import "./relationship.osl"
+import "./sandbox.osl"
 
 import "./commands/hello.osl"
 import "./commands/roturacc.osl"

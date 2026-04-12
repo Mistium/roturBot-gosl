@@ -1,20 +1,22 @@
 def message_new(*Connection c, object json, string token) (
-  object msg = json.message
-  string content = msg.content
+	object msg = json.message
+	string content = msg.content
 
-  if msg.user.toStr() == "roturbot" (
-    return
-  )
+	if msg.user.toStr() == "roturbot" (
+		return
+	)
 
-  string server_url = c.Get("serverUrl").toStr()
+	string server_url = c.Get("serverUrl").toStr()
+	string server_id = encodeURIComponent(server_url)
+	string channel_id = json.channel.toStr()
 
-  if server_url == "wss://chats.mistium.com" (
-    trackMessage(msg.user.toStr())
-    number count = getUserMessageCount7Days(msg.user.toStr())
-    updateActivityRole(c, msg.user.toStr(), count)
-  )
+	cacheAddMessage(server_id, channel_id, msg)
 
-  addMessageToCache(json.channel.toStr(), msg)
+	if server_url == "wss://chats.mistium.com" (
+		trackMessage(msg.user.toStr())
+		number count = getUserMessageCount7Days(msg.user.toStr())
+		updateActivityRole(c, msg.user.toStr(), count)
+	)
 
   object counting_msg = rawToMsg(json)
   if handleCountingMessage(c, counting_msg, server_url) (
@@ -56,8 +58,7 @@ def message_new(*Connection c, object json, string token) (
     command_found = true
   )
 
-  // Handle DMs with AI if no command was found
-  if !command_found and server_url == "wss://dms.mistium.com" (
-    handleAIQuery(c, rawToMsg(json), server_url)
-  )
+	if !command_found and server_url == "wss://dms.mistium.com" (
+		handleAIQuery(c, rawToMsg(json), server_url)
+	)
 )

@@ -8,12 +8,15 @@ def queryAI(array messages, string tier, bool use_tools, array tools) object (
   api_key = (config["nvidia-api"] ?? api_key).toStr()
 
   // Tier-based model selection matching Python version:
-  // Lite → gpt-oss-120b
+  // Free → gpt-oss-120b
+  // Lite → moonshotai/kimi-k2-instruct-0905
   // Plus/Drive/Pro/Max → z-ai/glm4.7 with thinking enabled
-  string model_to_use = "openai/gpt-oss-120b"
+  string model_to_use = "moonshotai/kimi-k2-instruct-0905"
   bool use_thinking = false
 
-  if tier != "Lite" (
+  if tier == "Free" (
+    model_to_use = "openai/gpt-oss-120b"
+  ) else if tier != "Lite" (
     model_to_use = "z-ai/glm4.7"
     use_thinking = true
   )

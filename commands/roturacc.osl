@@ -64,7 +64,7 @@ def roturacc(*Connection c, object msg) (
       )
       sendResponse(c, msg, "Token: " ++ data.key.toStr())
     case "sub"
-      if spl.len < 4 (
+      if spl.len < 3 (
         sendResponse(c, msg, "Usage: !roturacc <username> sub <tier>")
         return
       )
@@ -81,5 +81,18 @@ def roturacc(*Connection c, object msg) (
         return
       )
       sendResponse(c, msg, "Added subscription " ++ tier ++ " to " ++ username ++ " for 31 days")
+    case "delete"
+      string username = spl[1].toStr()
+      object data = getUserData(username)
+      if data.error != null (
+        sendResponse(c, msg, data.error.toStr())
+        return
+      )
+      object resp = deleteUser(username)
+      if resp.error != null (
+        sendResponse(c, msg, resp.error.toStr())
+        return
+      )
+      sendResponse(c, msg, "Deleted user " ++ username)
   )
 )
