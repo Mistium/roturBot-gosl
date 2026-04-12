@@ -395,13 +395,121 @@ def addSubscription(username, tier) object (
 )
 
 def roturGetUser(username) object (
-  object resp = requests.Get("https://api.rotur.dev/admin/get_user_by?key=username&value=" ++ username.toStr(), ADMIN_HEADERS)
-  if !resp.success (
-    return { error: "Request failed" }
-  )
-  any parsed = resp.body.toStr().JsonParse()
-  if typeof(parsed) != "object" (
-    return { error: "Invalid response" }
-  )
-  return parsed.assert(object)
+	object resp = requests.Get("https://api.rotur.dev/admin/get_user_by?key=username&value=" ++ username.toStr(), ADMIN_HEADERS)
+	if !resp.success (
+		return { error: "Request failed" }
+	)
+	any parsed = resp.body.toStr().JsonParse()
+	if typeof(parsed) != "object" (
+		return { error: "Invalid response" }
+	)
+	return parsed.assert(object)
+)
+
+def deleteUser(username) object (
+	object resp = requests.Post("https://api.rotur.dev/admin/delete_user", {
+		"content-type": "application/json",
+		"Authorization": ADMIN_TOKEN,
+		"body": { "username": username }
+	})
+	if !resp.success (
+		return { error: "Request failed" }
+	)
+	any parsed = resp.body.toStr().JsonParse()
+	if typeof(parsed) != "object" (
+		return { success: true }
+	)
+	return parsed.assert(object)
+)
+
+def banUser(username) object (
+	object resp = requests.Post("https://api.rotur.dev/admin/ban_user", {
+		"content-type": "application/json",
+		"Authorization": ADMIN_TOKEN,
+		"body": { "username": username }
+	})
+	if !resp.success (
+		return { error: "Request failed" }
+	)
+	any parsed = resp.body.toStr().JsonParse()
+	if typeof(parsed) != "object" (
+		return { success: true }
+	)
+	return parsed.assert(object)
+)
+
+def setStanding(username, level, reason) object (
+	object resp = requests.Post("https://api.rotur.dev/admin/set_standing", {
+		"content-type": "application/json",
+		"Authorization": ADMIN_TOKEN,
+		"body": { "username": username, "level": level, "reason": reason }
+	})
+	if !resp.success (
+		return { error: "Request failed" }
+	)
+	any parsed = resp.body.toStr().JsonParse()
+	if typeof(parsed) != "object" (
+		return { error: "Invalid response" }
+	)
+	return parsed.assert(object)
+)
+
+def recoverStanding(username, reason) object (
+	object resp = requests.Post("https://api.rotur.dev/admin/recover_standing", {
+		"content-type": "application/json",
+		"Authorization": ADMIN_TOKEN,
+		"body": { "username": username, "reason": reason }
+	})
+	if !resp.success (
+		return { error: "Request failed" }
+	)
+	any parsed = resp.body.toStr().JsonParse()
+	if typeof(parsed) != "object" (
+		return { error: "Invalid response" }
+	)
+	return parsed.assert(object)
+)
+
+def getStandingHistory(username) object (
+	object resp = requests.Post("https://api.rotur.dev/admin/get_standing_history", {
+		"content-type": "application/json",
+		"Authorization": ADMIN_TOKEN,
+		"body": { "username": username }
+	})
+	if !resp.success (
+		return { error: "Request failed" }
+	)
+	any parsed = resp.body.toStr().JsonParse()
+	if typeof(parsed) != "object" (
+		return { error: "Invalid response" }
+	)
+	return parsed.assert(object)
+)
+
+def adminGetUsers(system_name, token) object (
+	object resp = requests.Get("https://api.rotur.dev/system/users?auth=" ++ token.toStr() ++ "&system=" ++ system_name.toStr())
+	if !resp.success (
+		return { error: "Request failed" }
+	)
+	any parsed = resp.body.toStr().JsonParse()
+	if typeof(parsed) != "object" (
+		return { error: "Invalid response" }
+	)
+	return parsed.assert(object)
+)
+
+def adminDeleteUserKey(username, key) object (
+	object resp = requests.Post("https://api.rotur.dev/admin/update_user", {
+		"content-type": "application/json",
+		"Authorization": ADMIN_TOKEN,
+		"body": { "type": "remove", "username": username, "key": key }
+	})
+	if !resp.success (
+		return { error: "Request failed" }
+	)
+	any parsed = resp.body.toStr().JsonParse()
+	if typeof(parsed) != "object" (
+		return { error: "Invalid response" }
+	)
+	return parsed.assert(object)
 )

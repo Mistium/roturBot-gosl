@@ -71,13 +71,23 @@ array ACTIVITY_ROLE_NAMES = ["Active 100+", "Active 500+", "Active 1000+", "Acti
 
 string RECENT_LISTENED_LOCK = "recent_listened_messages"
 
-string SANDBOX_SERVICE_URL = config["sandbox-service-url"] ?? "http://localhost:3100"
-string SANDBOX_API_KEY = config["sandbox-api-key"] ?? "roturbot-sandbox-key"
+array RESTRICTED_KEYS = ["username", "max_size", "created", "id", "discord_id", "sys.currency", "sys.subscription", "key"]
 
-object SANDBOX_HEADERS = {
-  "Authorization": "Bearer " ++ SANDBOX_API_KEY,
-  "Content-Type": "application/json"
-}
+array ALLOWED_STANDINGS = ["good", "warning", "suspended", "banned"]
+
+object systems = {}
+
+def loadSystems() (
+  object response = requests.Get("https://api.rotur.dev/systems")
+  if !response.success (
+    return
+  )
+  any parsed = response.body.toStr().JsonParse()
+  if typeof(parsed) != "object" (
+    return
+  )
+  systems = parsed.assert(object)
+)
 
 import "./channel_cache.osl"
 import "./ai/ai.osl"
@@ -96,7 +106,6 @@ import "./message_tracker.osl"
 import "./activity_roles.osl"
 import "./emotional_state.osl"
 import "./relationship.osl"
-import "./sandbox.osl"
 
 import "./commands/hello.osl"
 import "./commands/roturacc.osl"
@@ -173,6 +182,8 @@ import "./handlers/users_list.osl"
 import "./personality_store.osl"
 
 mainloop:
+
+  loadSystems()
 
   initUserPersonalities()
 

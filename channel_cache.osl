@@ -1,13 +1,13 @@
-def withLock(string lock_name, any func) any (
+def withLock(string lock_name, any fn) any (
 	lock.Lock(lock_name)
-	any result = func()
+	any result = fn.call()
 	lock.Unlock(lock_name)
 	return result
 )
 
-def withLockArg(string lock_name, any arg, any func) any (
+def withLockArg(string lock_name, any arg, any fn) any (
 	lock.Lock(lock_name)
-	any result = func(arg)
+	any result = fn.call(arg)
 	lock.Unlock(lock_name)
 	return result
 )
@@ -18,28 +18,28 @@ def _cacheKey(string server_id, string channel_id) string (
 
 def cacheAddMessage(string server_id, string channel_id, object msg) (
 	lock.Lock(CHANNEL_CACHE_LOCK)
-	
+
 	string key = _cacheKey(server_id, channel_id)
-	
+
 	if !CHANNEL_MESSAGE_CACHE.contains(key) (
 		CHANNEL_MESSAGE_CACHE[key] = []
 	)
-	
+
 	array messages = CHANNEL_MESSAGE_CACHE[key].assert(array)
-	
+
 	object msg_data = {
 		id: (msg.id ?? "").toStr(),
 		author: (msg.user ?? "unknown").toStr(),
 		content: (msg.content ?? "").toStr(),
 		timestamp: timestamp
 	}
-	
+
 	if msg.reply_to != null and typeof(msg.reply_to) == "object" (
 		object reply_to = msg.reply_to.assert(object)
 		msg_data.reply_to_user = (reply_to.user ?? "unknown").toStr()
 		msg_data.reply_to_content = (reply_to.content ?? "").toStr()
 	)
-	
+
 	if msg.attachments != null and typeof(msg.attachments) == "array" (
 		array atts = msg.attachments.assert(array)
 		if atts.len > 0 (
@@ -55,85 +55,93 @@ def cacheAddMessage(string server_id, string channel_id, object msg) (
 			)
 		)
 	)
-	
+
 	if msg.reactions != null and typeof(msg.reactions) == "object" (
 		msg_data.reactions = msg.reactions
 	)
-	
+
 	messages.append(msg_data)
-	
+
 	if messages.len > CHANNEL_CACHE_MAX_SIZE (
 		array new_messages = []
-		number start = messages.len - CHANNEL_CACHE_MAX_SIZE
-		for i CHANNEL_CACHE_MAX_SIZE (
-			new_messages.append(messages[start + i])
+		number start = messages.len.toNum() - CHANNEL_CACHE_MAX_SIZE.toNum()
+		number idx = 0
+		loop CHANNEL_CACHE_MAX_SIZE.toNum() (
+			idx += 1
+			new_messages.append(messages[start + idx])
 		)
 		CHANNEL_MESSAGE_CACHE[key] = new_messages
 	)
-	
+
 	lock.Unlock(CHANNEL_CACHE_LOCK)
 )
 
 def cacheGetMessages(string server_id, string channel_id, number limit) array (
 	lock.Lock(CHANNEL_CACHE_LOCK)
-	
+
 	string key = _cacheKey(server_id, channel_id)
-	
+
 	if !CHANNEL_MESSAGE_CACHE.contains(key) (
 		lock.Unlock(CHANNEL_CACHE_LOCK)
 		return []
 	)
-	
+
 	array messages = CHANNEL_MESSAGE_CACHE[key].assert(array)
-	
+
 	if messages.len == 0 (
 		lock.Unlock(CHANNEL_CACHE_LOCK)
 		return []
 	)
-	
+
 	number start = 0
 	if messages.len > limit (
-		start = messages.len - limit
+		start = messages.len.toNum() - limit.toNum()
 	)
-	
+
 	array result = []
-	for i messages.len - start (
-		result.append(messages[start + i])
+	number count = messages.len.toNum() - start
+	number idx = 0
+	loop count (
+		idx += 1
+		result.append(messages[start + idx])
 	)
-	
+
 	lock.Unlock(CHANNEL_CACHE_LOCK)
 	return result
 )
 
 def cacheGetHistoryString(string server_id, string channel_id, number limit) string (
 	lock.Lock(CHANNEL_CACHE_LOCK)
-	
+
 	string key = _cacheKey(server_id, channel_id)
-	
+
 	if !CHANNEL_MESSAGE_CACHE.contains(key) (
 		lock.Unlock(CHANNEL_CACHE_LOCK)
 		return ""
 	)
-	
+
 	array messages = CHANNEL_MESSAGE_CACHE[key].assert(array)
-	
+
 	if messages.len == 0 (
 		lock.Unlock(CHANNEL_CACHE_LOCK)
 		return ""
 	)
-	
+
 	number start = 0
 	if messages.len > limit (
-		start = messages.len - limit
+		start = messages.len.toNum() - limit.toNum()
 	)
-	
+
 	array history_lines = []
-	
-	for i messages.len - start (
-		object msg = messages[start + i].assert(object)
-		
+
+	number count = messages.len.toNum() - start
+	number idx = 0
+	loop count (
+		idx += 1
+		object msg = messages[start + idx].assert(object)
+
 		string line = (msg.author ?? "unknown").toStr() ++ " said \"" ++ (msg.content ?? "").toStr() ++ "\""
-		
+
 		if msg.reply_to_user != null (
 			line ++= " (in reply to " ++ msg.reply_to_user.toStr()
 			if msg.reply_to_content != null and msg.reply_to_content.toStr().len > 0 (
@@ -141,23 +149,23 @@ def cacheGetHistoryString(string server_id, string channel_id, number limit) str
 			)
 			line ++= ")"
 		)
-		
+
 		if msg.attachments != null and typeof(msg.attachments) == "array" (
 			array atts = msg.attachments.assert(array)
 			if atts.len > 0 (
 				line ++= " (with attachments: " ++ atts.join(", ") ++ ")"
 			)
 		)
-		
+
 		if msg.reactions != null and typeof(msg.reactions) == "object" (
 			line ++= " (with reactions: " ++ msg.reactions.toStr() ++ ")"
 		)
-		
+
 		line ++= " (message_id: " ++ (msg.id ?? "").toStr() ++ ")"
-		
+
 		history_lines.append(line)
 	)
-	
+
 	lock.Unlock(CHANNEL_CACHE_LOCK)
 	return history_lines.join("\n")
 )
@@ -195,16 +203,16 @@ def cacheClearAll() (
 
 def cacheGetMessageById(string server_id, string channel_id, string message_id) object (
 	lock.Lock(CHANNEL_CACHE_LOCK)
-	
+
 	string key = _cacheKey(server_id, channel_id)
-	
+
 	if !CHANNEL_MESSAGE_CACHE.contains(key) (
 		lock.Unlock(CHANNEL_CACHE_LOCK)
 		return null
 	)
-	
+
 	array messages = CHANNEL_MESSAGE_CACHE[key].assert(array)
-	
+
 	for i messages.len (
 		object msg = messages[i].assert(object)
 		if (msg.id ?? "").toStr() == message_id (
@@ -212,7 +220,7 @@ def cacheGetMessageById(string server_id, string channel_id, string message_id) 
 			return msg
 		)
 	)
-	
+
 	lock.Unlock(CHANNEL_CACHE_LOCK)
 	return null
 )

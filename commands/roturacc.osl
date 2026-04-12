@@ -1,17 +1,44 @@
 def roturacc(*Connection c, object msg) (
-  if msg.user != "mist" (
-    sendResponse(c, msg, "You are not allowed to use this command.")
-    return
-  )
+	string caller_name = msg.user.toStr()
 
-  array spl = msg.content.toStr().split(" ")
+	if systems.getKeys().len == 0 (
+		sendResponse(c, msg, "No systems found.")
+		return
+	)
 
-  if spl.len < 2 (
-    sendResponse(c, msg, "Usage: !roturacc <username> <cmd>")
-    return
-  )
+  log systems
 
-  switch spl[2] (
+	bool is_allowed = false
+	object user_system = null
+	array system_keys = systems.getKeys()
+	for i system_keys.len (
+		object sys = systems[system_keys[i].toStr()]
+		if sys.owner != null and sys.owner.name.toStr() == caller_name (
+			is_allowed = true
+			user_system = sys
+			break
+		)
+	)
+
+	if !is_allowed (
+		sendResponse(c, msg, "You are not authorized to use this command.")
+		return
+	)
+
+	array spl = msg.content.toStr().split(" ")
+
+	if spl.len == 0 (
+		spl = ["help"]
+	)
+
+	bool is_mistium = caller_name.toLower() == "mist"
+
+	string username = ""
+	if spl.len >= 2 (
+		username = spl[1].toStr().toLower()
+	)
+
+	switch spl[1].toStr() (
     case "help"
       array lines = [
         "!roturacc [name] update [key] [value]",
@@ -35,44 +62,212 @@ def roturacc(*Connection c, object msg) (
         "!roturacc [name] remove_badge <badge>"
       ]
       sendResponse(c, msg, lines.join("\n"))
-    case "get"
-      string username = spl[1].toStr()
+      return
+    case "banned_words"
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can view banned words.")
+        return
+      )
+      array words = openArrayFile("./banned_words.json")
+      sendResponse(c, msg, "Banned words: " ++ words.join(", "))
+      return
+	)
+
+	if spl.len < 2 (
+		sendResponse(c, msg, "Usage: !roturacc <username> <command>")
+		return
+	)
+
+	string command = spl[2].toStr()
+
+	switch command (
+    case "size"
       object data = getUserData(username)
       if data.error != null (
         sendResponse(c, msg, data.error.toStr())
         return
+      )
+      object mist_data = getUserData("mist")
+      object usage_data = getUserFileSize(mist_data.key)
+      if usage_data.error != null (
+        sendResponse(c, msg, "No file system found for user " ++ username ++ ".")
+        return
+      )
+      sendResponse(c, msg, "File system size for " ++ username ++ ": " ++ usage_data.toStr())
+    case "get"
+      object data = getUserData(username)
+      if data.error != null (
+        sendResponse(c, msg, data.error.toStr())
+        return
+      )
+      if !is_mistium and data.system.toStr() != user_system.name.toStr() (
+        sendResponse(c, msg, "User " ++ username ++ " not found in your system.")
+        return
+      )
+      if data.contains("key") (
+        data.delete("key")
       )
       sendResponse(c, msg, data.toStr())
-    case "size"
-      string username = spl[1].toStr()
+    case "update"
+      if spl.len < 5 (
+        sendResponse(c, msg, "Usage: !roturacc <username> update <key> <...value>")
+        return
+      )
+      string key = spl[3].toStr()
+      string value = spl.slice(4).join(" ")
+
       object data = getUserData(username)
       if data.error != null (
         sendResponse(c, msg, data.error.toStr())
         return
       )
-      if !data.contains("used_size") (
-        sendResponse(c, msg, "Size: unknown")
+      if !is_mistium and data.system.toStr() != user_system.name.toStr() (
+        sendResponse(c, msg, "User " ++ username ++ " not found in your system.")
         return
       )
-      sendResponse(c, msg, "Size: " ++ data.used_size.toStr())
+
+      bool is_restricted = false
+      for i RESTRICTED_KEYS.len (
+        if RESTRICTED_KEYS[i].toStr() == key (
+          is_restricted = true
+          break
+        )
+      )
+      if !is_mistium and is_restricted (
+        sendResponse(c, msg, "You do not have permission to update " ++ key ++ ".")
+        return
+      )
+
+      any send_value = value
+      if key == "sys.currency" (
+        number parsed_num = value.toNum()
+        if parsed_num == 0 and value != "0" (
+          sendResponse(c, msg, "Invalid currency value: " ++ value)
+          return
+        )
+        send_value = parsed_num
+      )
+
+      object resp = adminUpdateUser("update", username, key, send_value)
+      if resp.error != null (
+        sendResponse(c, msg, "Error updating user " ++ username ++ ": " ++ resp.error.toStr())
+        return
+      )
+      sendResponse(c, msg, "Updated " ++ key ++ " for user " ++ username ++ " to " ++ value ++ ".")
+    case "remove"
+      if spl.len < 4 (
+        sendResponse(c, msg, "Usage: !roturacc <username> remove <key>")
+        return
+      )
+      string key = spl[3].toStr()
+
+      object data = getUserData(username)
+      if data.error != null (
+        sendResponse(c, msg, data.error.toStr())
+        return
+      )
+      if !is_mistium and data.system.toStr() != user_system.name.toStr() (
+        sendResponse(c, msg, "User " ++ username ++ " not found in your system.")
+        return
+      )
+
+      bool is_restricted = false
+      for i RESTRICTED_KEYS.len (
+        if RESTRICTED_KEYS[i].toStr() == key (
+          is_restricted = true
+          break
+        )
+      )
+      if is_restricted (
+        sendResponse(c, msg, "You do not have permission to remove " ++ key ++ ".")
+        return
+      )
+
+      if !data.contains(key) (
+        sendResponse(c, msg, "Key " ++ key ++ " not found for user " ++ username ++ ".")
+        return
+      )
+
+      object resp = adminDeleteUserKey(username, key)
+      if resp.error != null (
+        sendResponse(c, msg, "Error removing " ++ key ++ " for user " ++ username ++ ": " ++ resp.error.toStr())
+        return
+      )
+      sendResponse(c, msg, "Removed " ++ key ++ " for user " ++ username ++ ".")
+    case "delete"
+      object data = getUserData(username)
+      if data.error != null or data.username.toStr() == "" (
+        sendResponse(c, msg, "User " ++ username ++ " not found.")
+        return
+      )
+      if !is_mistium and data.system.toStr() != user_system.name.toStr() (
+        sendResponse(c, msg, "User " ++ username ++ " not found in your system.")
+        return
+      )
+
+      object resp = deleteUser(username)
+      if resp.error != null (
+        sendResponse(c, msg, resp.error.toStr())
+        return
+      )
+      sendResponse(c, msg, "Deleted user " ++ username ++ " from your system.")
+    case "ban"
+      object data = getUserData(username)
+      if data.error != null or data.username.toStr() == "" (
+        sendResponse(c, msg, "User " ++ username ++ " not found.")
+        return
+      )
+      if !is_mistium and data.system.toStr() != user_system.name.toStr() (
+        sendResponse(c, msg, "User " ++ username ++ " not found in your system.")
+        return
+      )
+
+      object resp = banUser(username)
+      if resp.error != null (
+        sendResponse(c, msg, resp.error.toStr())
+        return
+      )
+      sendResponse(c, msg, "Banned user " ++ username ++ ".")
+    case "get_users"
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can view users")
+        return
+      )
+      object mist_data = getUserData("mist")
+      object users_resp = adminGetUsers(spl[1].toStr(), mist_data.key)
+      if users_resp.error != null (
+        sendResponse(c, msg, "No users found.")
+        return
+      )
+      sendResponse(c, msg, users_resp.toStr())
     case "token"
-      string username = spl[1].toStr()
-      object data = getUserData(username)
-      if data.error != null (
-        sendResponse(c, msg, data.error.toStr())
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can view tokens")
         return
       )
-      sendResponse(c, msg, "Token: " ++ data.key.toStr())
+      object data = getUserData(username)
+      if data.error != null (
+        sendResponse(c, msg, "User " ++ username ++ " not found.")
+        return
+      )
+      sendResponse(c, msg, "Token for " ++ username ++ ": " ++ (data.key ?? "No token found.").toStr())
     case "sub"
-      if spl.len < 3 (
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can add subscriptions")
+        return
+      )
+      if spl.len < 4 (
         sendResponse(c, msg, "Usage: !roturacc <username> sub <tier>")
         return
       )
-      string username = spl[1].toStr()
       string tier = spl[3].toStr()
+      if username == "" or tier == "" (
+        sendResponse(c, msg, "Usage: !roturacc <username> sub <tier>")
+        return
+      )
       object data = getUserData(username)
-      if data.error != null (
-        sendResponse(c, msg, data.error.toStr())
+      if data.error != null or data.username.toStr() == "" (
+        sendResponse(c, msg, "User " ++ username ++ " not found.")
         return
       )
       object resp = addSubscription(username, tier)
@@ -81,18 +276,279 @@ def roturacc(*Connection c, object msg) (
         return
       )
       sendResponse(c, msg, "Added subscription " ++ tier ++ " to " ++ username ++ " for 31 days")
-    case "delete"
-      string username = spl[1].toStr()
+    case "ban_word"
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can ban words")
+        return
+      )
+      string word = spl[1].toStr()
+      if word == "" (
+        sendResponse(c, msg, "Usage: !roturacc <word> ban_word")
+        return
+      )
+      array words = openArrayFile("./banned_words.json")
+      for i words.len (
+        if words[i].toStr() == word (
+          sendResponse(c, msg, "Word " ++ word ++ " is already banned.")
+          return
+        )
+      )
+      words.append(word)
+      fs.WriteFile("./banned_words.json", words.JsonStringify())
+      sendResponse(c, msg, "Banned word " ++ word ++ ".")
+    case "unban_word"
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can unban words")
+        return
+      )
+      string word = spl[1].toStr()
+      if word == "" (
+        sendResponse(c, msg, "Usage: !roturacc <word> unban_word")
+        return
+      )
+      array words = openArrayFile("./banned_words.json")
+      bool found = false
+      array new_words = []
+      for i words.len (
+        if words[i].toStr() != word (
+          new_words.append(words[i])
+        ) else (
+          found = true
+        )
+      )
+      if !found (
+        sendResponse(c, msg, "Word " ++ word ++ " is not banned.")
+        return
+      )
+      fs.WriteFile("./banned_words.json", new_words.JsonStringify())
+      sendResponse(c, msg, "Unbanned word " ++ word ++ ".")
+    case "add_badge"
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can add badges")
+        return
+      )
+      if spl.len < 4 (
+        sendResponse(c, msg, "Usage: !roturacc <username> add_badge <badge>")
+        return
+      )
+      string badge = spl[3].toStr()
+      if username == "" or badge == "" (
+        sendResponse(c, msg, "Usage: !roturacc <username> add_badge <badge>")
+        return
+      )
+      object data = getUserData(username)
+      if data.error != null or data.username.toStr() == "" (
+        sendResponse(c, msg, "User " ++ username ++ " not found.")
+        return
+      )
+      array badges = openArrayFile("./rotur/badges.json")
+      for i badges.len (
+        object badge_data = badges[i].assert(object)
+        if badge_data.name.toStr() == badge (
+          array users = badge_data.users.assert(array)
+          for j users.len (
+            if users[j].toStr() == username (
+              sendResponse(c, msg, "User " ++ username ++ " is already a member of badge " ++ badge ++ ".")
+              return
+            )
+          )
+          users.append(username)
+          fs.WriteFile("./rotur/badges.json", badges.JsonStringify())
+          sendResponse(c, msg, "Added badge " ++ badge ++ " to " ++ username ++ ".")
+          return
+        )
+      )
+      sendResponse(c, msg, "Badge " ++ badge ++ " not found.")
+    case "remove_badge"
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can remove badges")
+        return
+      )
+      if spl.len < 4 (
+        sendResponse(c, msg, "Usage: !roturacc <username> remove_badge <badge>")
+        return
+      )
+      string badge = spl[3].toStr()
+      if username == "" or badge == "" (
+        sendResponse(c, msg, "Usage: !roturacc <username> remove_badge <badge>")
+        return
+      )
+      object data = getUserData(username)
+      if data.error != null or data.username.toStr() == "" (
+        sendResponse(c, msg, "User " ++ username ++ " not found.")
+        return
+      )
+      array badges = openArrayFile("./rotur/badges.json")
+    for i badges.len (
+      object badge_data = badges[i].assert(object)
+      if badge_data.name.toStr() == badge (
+        array users = badge_data.users.assert(array)
+        number member_idx = -1
+        for p users.len (
+          if users[p].toStr() == username (
+            member_idx = p.toNum()
+            break
+          )
+        )
+        if member_idx < 0 (
+          sendResponse(c, msg, "User " ++ username ++ " is not a member of badge " ++ badge ++ ".")
+          return
+        )
+        array badge_users = badge_data.users.assert(array)
+        array new_users = []
+        for q badge_users.len (
+          if q.toNum() != member_idx (
+            new_users.append(badge_users[q])
+          )
+        )
+        badge_data.users = new_users
+        fs.WriteFile("./rotur/badges.json", badges.JsonStringify())
+        sendResponse(c, msg, "Removed badge " ++ badge ++ " from " ++ username ++ ".")
+        return
+      )
+    )
+      sendResponse(c, msg, "Badge " ++ badge ++ " not found.")
+    case "set_standing"
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can set standing")
+        return
+      )
+      if spl.len < 5 (
+        sendResponse(c, msg, "Usage: !roturacc <username> set_standing <level> <reason>")
+        return
+      )
+      string level = spl[3].toStr().toLower()
+      string reason = spl.slice(4).join(" ")
+
+      bool valid_level = false
+      for i ALLOWED_STANDINGS.len (
+        if ALLOWED_STANDINGS[i].toStr() == level (
+          valid_level = true
+          break
+        )
+      )
+      if !valid_level (
+        sendResponse(c, msg, "Invalid standing level. Must be: good, warning, suspended, or banned")
+        return
+      )
+
       object data = getUserData(username)
       if data.error != null (
-        sendResponse(c, msg, data.error.toStr())
+        sendResponse(c, msg, "User " ++ username ++ " not found.")
         return
       )
-      object resp = deleteUser(username)
+
+      object resp = setStanding(username, level, reason)
       if resp.error != null (
-        sendResponse(c, msg, resp.error.toStr())
+        sendResponse(c, msg, "Failed to set standing: " ++ resp.error.toStr())
         return
       )
-      sendResponse(c, msg, "Deleted user " ++ username)
-  )
+      if resp.success != null and resp.success.toBool() (
+        string new_standing = (resp.standing ?? level).toStr()
+        sendResponse(c, msg, "Standing for " ++ username ++ " set to " ++ new_standing.toUpper() ++ ". Reason: " ++ reason)
+      ) else (
+        sendResponse(c, msg, "Failed to set standing: Unknown error")
+      )
+    case "recover_standing"
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can recover standing")
+        return
+      )
+      if spl.len < 4 (
+        sendResponse(c, msg, "Usage: !roturacc <username> recover_standing <reason>")
+        return
+      )
+      string reason = spl.slice(3).join(" ")
+
+      object data = getUserData(username)
+      if data.error != null (
+        sendResponse(c, msg, "User " ++ username ++ " not found.")
+        return
+      )
+
+      object resp = recoverStanding(username, reason)
+      if resp.error != null (
+        sendResponse(c, msg, "Failed to recover standing: " ++ resp.error.toStr())
+        return
+      )
+      if resp.success != null and resp.success.toBool() (
+        string previous = (resp.previous_standing ?? "unknown").toStr()
+        string new_standing = (resp.new_standing ?? "good").toStr()
+        sendResponse(c, msg, "Standing recovered for " ++ username ++ ": " ++ previous.toUpper() ++ " -> " ++ new_standing.toUpper() ++ ". Reason: " ++ reason)
+      ) else (
+        sendResponse(c, msg, "Failed to recover standing: Unknown error")
+      )
+    case "standing_history"
+      if !is_mistium (
+        sendResponse(c, msg, "Only mistium can view standing history")
+        return
+      )
+
+      object resp = getStandingHistory(username)
+      if resp.error != null (
+        sendResponse(c, msg, "Error: " ++ resp.error.toStr())
+        return
+      )
+
+      string current_standing = (resp.standing ?? "good").toStr()
+    array history = resp.history ?? []
+
+    array lines = ["Standing for " ++ username ++ ": " ++ current_standing.toUpper(), "History:"]
+
+    if history.len == 0 (
+      lines.append("No standing changes recorded.")
+    ) else (
+      number start_idx = 1
+      if history.len > 15 (
+        start_idx = history.len.toNum() - 15
+      )
+      number hidx = start_idx - 1
+      loop history.len.toNum() - start_idx + 1 (
+        hidx += 1
+        object entry = history[hidx].assert(object)
+        string lvl = (entry.level ?? "unknown").toStr()
+        string rsn = (entry.reason ?? "No reason").toStr()
+        number ts = (entry.timestamp ?? 0).toNum()
+        string admin_id = (entry.admin_id ?? "system").toStr()
+
+        string time_str = "Unknown"
+        if ts > 0 (
+          time_str = formatTimestamp(ts)
+        )
+
+        lines.append(" [" ++ time_str ++ "] " ++ lvl.toUpper() ++ " - " ++ rsn)
+        lines.append(" By: " ++ admin_id)
+      )
+      if history.len > 15 (
+        lines.append("\nShowing 15 of " ++ history.len.toStr() ++ " entries")
+      )
+    )
+    sendResponse(c, msg, lines.join("\n"))
+    case "refresh_token"
+    object data = getUserData(username)
+    if data.error != null (
+      sendResponse(c, msg, data.error.toStr())
+        return
+      )
+      if !is_mistium and data.system.toStr() != user_system.name.toStr() (
+        sendResponse(c, msg, "User " ++ username ++ " not found in your system.")
+        return
+      )
+      object resp = refreshToken(data.key.toStr())
+      if resp.error != null (
+        sendResponse(c, msg, "Error refreshing token: " ++ resp.error.toStr())
+        return
+      )
+      sendResponse(c, msg, "Token refreshed for " ++ username ++ ".")
+    default
+      sendResponse(c, msg, "Unknown command: " ++ command)
+	)
+)
+
+def formatTimestamp(number ts) string (
+	number seconds = ts / 1000
+	number days = seconds / 86400
+	number hours = (seconds % 86400) / 3600
+	number minutes = (seconds % 3600) / 60
+	return days.toStr() ++ "d " ++ hours.toStr() ++ "h " ++ minutes.toStr() ++ "m ago"
 )
