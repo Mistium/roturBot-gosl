@@ -829,10 +829,10 @@ def processResponse(*Connection c, object reply_msg, object response, string tie
   content = sanitizeContent(content)
 
   if tier == "Free" (
-    content = "(Free - gpt-oss-120b)\n" ++ content
+    content = "(Free - gpt-oss-20b)\n" ++ content
   )
   if tier == "Lite" (
-    content = "(Lite - qwen3.5)\n" ++ content
+    content = "(Lite - gpt-oss-120b)\n" ++ content
   )
 
   if content.len > 2000 (

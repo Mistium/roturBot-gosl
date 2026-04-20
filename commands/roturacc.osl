@@ -6,8 +6,6 @@ def roturacc(*Connection c, object msg) (
 		return
 	)
 
-  log systems
-
 	bool is_allowed = false
 	object user_system = null
 	array system_keys = systems.getKeys()
@@ -109,7 +107,7 @@ def roturacc(*Connection c, object msg) (
       )
       sendResponse(c, msg, data.toStr())
     case "update"
-      if spl.len < 5 (
+      if spl.len < 4 (
         sendResponse(c, msg, "Usage: !roturacc <username> update <key> <...value>")
         return
       )
@@ -155,7 +153,7 @@ def roturacc(*Connection c, object msg) (
       )
       sendResponse(c, msg, "Updated " ++ key ++ " for user " ++ username ++ " to " ++ value ++ ".")
     case "remove"
-      if spl.len < 4 (
+      if spl.len < 3 (
         sendResponse(c, msg, "Usage: !roturacc <username> remove <key>")
         return
       )
@@ -256,7 +254,7 @@ def roturacc(*Connection c, object msg) (
         sendResponse(c, msg, "Only mistium can add subscriptions")
         return
       )
-      if spl.len < 4 (
+      if spl.len < 3 (
         sendResponse(c, msg, "Usage: !roturacc <username> sub <tier>")
         return
       )
@@ -327,7 +325,7 @@ def roturacc(*Connection c, object msg) (
         sendResponse(c, msg, "Only mistium can add badges")
         return
       )
-      if spl.len < 4 (
+      if spl.len < 3 (
         sendResponse(c, msg, "Usage: !roturacc <username> add_badge <badge>")
         return
       )
@@ -364,7 +362,7 @@ def roturacc(*Connection c, object msg) (
         sendResponse(c, msg, "Only mistium can remove badges")
         return
       )
-      if spl.len < 4 (
+      if spl.len < 3 (
         sendResponse(c, msg, "Usage: !roturacc <username> remove_badge <badge>")
         return
       )
@@ -413,7 +411,7 @@ def roturacc(*Connection c, object msg) (
         sendResponse(c, msg, "Only mistium can set standing")
         return
       )
-      if spl.len < 5 (
+      if spl.len < 4 (
         sendResponse(c, msg, "Usage: !roturacc <username> set_standing <level> <reason>")
         return
       )
@@ -454,7 +452,7 @@ def roturacc(*Connection c, object msg) (
         sendResponse(c, msg, "Only mistium can recover standing")
         return
       )
-      if spl.len < 4 (
+      if spl.len < 3 (
         sendResponse(c, msg, "Usage: !roturacc <username> recover_standing <reason>")
         return
       )
