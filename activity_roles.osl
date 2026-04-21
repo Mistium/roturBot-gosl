@@ -30,7 +30,33 @@ def getTierName(string role) string (
   return "Inactive"
 )
 
+def getRoleCreditAmount(string role) number (
+  if role == "Active 3000+" (
+    return 3.0
+  )
+  if role == "Active 1000+" (
+    return 2.5
+  )
+  if role == "Active 500+" (
+    return 2.0
+  )
+  if role == "Active 100+" (
+    return 1.5
+  )
+  return 1.0
+)
+
+def formatCreditText(number amount) string (
+  if amount == 1.0 (
+    return "1 credit"
+  )
+  return amount.toStr() ++ " credits"
+)
+
 def sendActivityAnnouncement(*Connection c, string username, string old_role, string new_role) (
+  if isUserExcludedFromActivityAlerts(username) (
+    return
+  )
   any conn_raw = connections["wss://chats.mistium.com"]
   if typeof(conn_raw) != "*Connection" (
     return
@@ -39,17 +65,19 @@ def sendActivityAnnouncement(*Connection c, string username, string old_role, st
 
   string message = ""
   if old_role == "" (
-    message = "@**" ++ username ++ "** has earned the **" ++ getTierName(new_role) ++ "** role! 🎉"
+    number credit_amount = getRoleCreditAmount(new_role)
+    message = "@" ++ username ++ " has earned the **" ++ getTierName(new_role) ++ "** role! 🎉 You now earn " ++ formatCreditText(credit_amount) ++ " per daily credit!"
   ) else (
     if new_role == "" (
-      message = "@**" ++ username ++ "** is no longer active enough to maintain their activity role."
+      message = "@" ++ username ++ " is no longer active enough to maintain their activity role. You now earn " ++ formatCreditText(1.0) ++ " per daily credit!"
     ) else (
       number old_threshold = getRoleThreshold(old_role)
       number new_threshold = getRoleThreshold(new_role)
+      number credit_amount = getRoleCreditAmount(new_role)
       if new_threshold > old_threshold (
-        message = "@**" ++ username ++ "** has ranked up to **" ++ getTierName(new_role) ++ "**! 🎉"
+        message = "@" ++ username ++ " has ranked up to **" ++ getTierName(new_role) ++ "**! 🎉 You now earn " ++ formatCreditText(credit_amount) ++ " per daily credit!"
       ) else (
-        message = "@**" ++ username ++ "** has dropped to **" ++ getTierName(new_role) ++ "**."
+        message = "@" ++ username ++ " has dropped to **" ++ getTierName(new_role) ++ "**. You now earn " ++ formatCreditText(credit_amount) ++ " per daily credit!"
       )
     )
   )
@@ -338,5 +366,74 @@ def checkActivityRoleDrops() (
         _performActivityRoleUpdate(c, username, cached_roles, count)
       )
     )
+  )
+)
+
+
+
+def _loadActivityExclusions() (
+  lock.Lock("activity_exclusions")
+  if _activity_exclusions_loaded (
+    lock.Unlock("activity_exclusions")
+    return
+  )
+  fs.Mkdir("store")
+  string data = fs.ReadFile(ACTIVITY_EXCLUSIONS_FILE)
+  if data.len == 0 (
+    _activity_exclusions = {}
+    _activity_exclusions_loaded = true
+    lock.Unlock("activity_exclusions")
+    return
+  )
+  any parsed = data.JsonParse()
+  if typeof(parsed) != "object" (
+    _activity_exclusions = {}
+    _activity_exclusions_loaded = true
+    lock.Unlock("activity_exclusions")
+    return
+  )
+  _activity_exclusions = parsed.assert(object)
+  _activity_exclusions_loaded = true
+  lock.Unlock("activity_exclusions")
+)
+
+def _saveActivityExclusions() (
+  lock.Lock("activity_exclusions")
+  string data = _activity_exclusions.JsonStringify()
+  lock.Unlock("activity_exclusions")
+  fs.WriteFile(ACTIVITY_EXCLUSIONS_FILE, data)
+)
+
+def isUserExcludedFromActivityAlerts(string username) bool (
+  _loadActivityExclusions()
+  lock.Lock("activity_exclusions")
+  string user_lower = username.toLower()
+  bool excluded = _activity_exclusions.contains(user_lower)
+  lock.Unlock("activity_exclusions")
+  return excluded
+)
+
+def toggleActivityAlertExclusion(string username) bool (
+  _loadActivityExclusions()
+  lock.Lock("activity_exclusions")
+  string user_lower = username.toLower()
+  if _activity_exclusions.contains(user_lower) (
+    _activity_exclusions.delete(user_lower)
+    lock.Unlock("activity_exclusions")
+    _saveActivityExclusions()
+    return false
+  )
+  _activity_exclusions[user_lower] = true
+  lock.Unlock("activity_exclusions")
+  _saveActivityExclusions()
+  return true
+)
+
+def activityAlertSlash(*Connection c, object msg) (
+  bool excluded = toggleActivityAlertExclusion(msg.user.toStr())
+  if excluded (
+    sendResponse(c, msg, "🔕 **Activity Alerts Disabled**\n\nYou will no longer receive ping notifications when your activity role changes.\n\nUse /activity_alert again to toggle.")
+  ) else (
+    sendResponse(c, msg, "🔔 **Activity Alerts Enabled**\n\nYou will now receive ping notifications when your activity role changes.\n\nUse /activity_alert again to toggle.")
   )
 )

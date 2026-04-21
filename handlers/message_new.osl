@@ -1,63 +1,55 @@
 def message_new(*Connection c, object json, string token) (
 	object msg = json.message
 	string content = msg.content
-
-	if msg.user.toStr() == "roturbot" (
-		return
-	)
-
 	string server_url = c.Get("serverUrl").toStr()
 	string server_id = encodeURIComponent(server_url)
 	string channel_id = json.channel.toStr()
-
 	cacheAddMessage(server_id, channel_id, msg)
-
+	if msg.user.toStr() == "roturbot" (
+		return
+	)
 	if server_url == "wss://chats.mistium.com" (
 		trackMessage(msg.user.toStr())
 		number count = getUserMessageCount7Days(msg.user.toStr())
 		updateActivityRole(c, msg.user.toStr(), count)
+		array roles = getUserRolesFromCache(msg.user.toStr())
+		processDailyCreditOnMessage(c, rawToMsg(json), msg.user.toStr(), roles)
 	)
-
-  object counting_msg = rawToMsg(json)
-  if handleCountingMessage(c, counting_msg, server_url) (
-    return
-  )
-
-  if content.contains("@roturBOT") (
-    handleAIQuery(c, rawToMsg(json), server_url)
-    return
-  )
-
-  any pings_raw = msg.pings
-  if typeof(pings_raw) == "object" (
-    object pings = pings_raw.assert(object)
-    any replies_raw = pings.replies
-    if typeof(replies_raw) == "array" (
-      array replies = replies_raw.assert(array)
-      for i replies.len (
-        string reply_text = replies[i].toStr()
-        if reply_text.toLower().contains("roturbot") (
-          handleAIQuery(c, rawToMsg(json), server_url)
-          return
-        )
-      )
-    )
-  )
-
-  bool command_found = false
-  array prefixes = commands.getKeys()
-  for i prefixes.len (
-    if !content.startsWith(prefixes[i].toStr()) (
-      continue
-    )
-
-    string new_content = content.trim(prefixes[i].len + 1, -1).strip()
-    object cmd_msg = rawToMsg(json)
-    cmd_msg.content = new_content
-    commands[prefixes[i]](c, cmd_msg)
-    command_found = true
-  )
-
+	object counting_msg = rawToMsg(json)
+	if handleCountingMessage(c, counting_msg, server_url) (
+		return
+	)
+	if content.contains("@roturBOT") (
+		handleAIQuery(c, rawToMsg(json), server_url)
+		return
+	)
+	any pings_raw = msg.pings
+	if typeof(pings_raw) == "object" (
+		object pings = pings_raw.assert(object)
+		any replies_raw = pings.replies
+		if typeof(replies_raw) == "array" (
+			array replies = replies_raw.assert(array)
+			for i replies.len (
+				string reply_text = replies[i].toStr()
+				if reply_text.toLower().contains("roturbot") (
+					handleAIQuery(c, rawToMsg(json), server_url)
+					return
+				)
+			)
+		)
+	)
+	bool command_found = false
+	array prefixes = commands.getKeys()
+	for i prefixes.len (
+		if !content.startsWith(prefixes[i].toStr()) (
+			continue
+		)
+		string new_content = content.trim(prefixes[i].len + 1, -1).strip()
+		object cmd_msg = rawToMsg(json)
+		cmd_msg.content = new_content
+		commands[prefixes[i]](c, cmd_msg)
+		command_found = true
+	)
 	if !command_found and server_url == "wss://dms.mistium.com" (
 		handleAIQuery(c, rawToMsg(json), server_url)
 	)

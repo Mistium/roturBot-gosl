@@ -1,0 +1,209 @@
+def _loadDailyActivity() (
+    lock.Lock("daily_activity")
+    if _daily_activity_loaded (
+        lock.Unlock("daily_activity")
+        return
+    )
+    fs.Mkdir("store")
+    string data = fs.ReadFile(DAILY_ACTIVITY_FILE)
+    if data.len == 0 (
+        _daily_activity = {}
+        _daily_activity_loaded = true
+        lock.Unlock("daily_activity")
+        return
+    )
+    any parsed = data.JsonParse()
+    if typeof(parsed) != "object" (
+        _daily_activity = {}
+        _daily_activity_loaded = true
+        lock.Unlock("daily_activity")
+        return
+    )
+    _daily_activity = parsed.assert(object)
+    _daily_activity_loaded = true
+    lock.Unlock("daily_activity")
+)
+
+def _saveDailyActivity() (
+    lock.Lock("daily_activity")
+    string data = _daily_activity.JsonStringify()
+    lock.Unlock("daily_activity")
+    fs.WriteFile(DAILY_ACTIVITY_FILE, data)
+)
+
+
+
+def _getCurrentDay() number (
+    return floor(timestamp / 86400000.0)
+)
+
+def getUserHighestRoleCredit(array roles) number (
+    number highest = DEFAULT_CREDIT
+    array role_keys = ROLE_CREDITS.getKeys()
+    for i roles.len (
+        string role = roles[i].toStr()
+        for j role_keys.len (
+            if role == role_keys[j].toStr() (
+                number val = ROLE_CREDITS[role_keys[j].toStr()].toNum()
+                if val > highest (
+                    highest = val
+                )
+            )
+        )
+    )
+    return highest
+)
+
+def _safeFloat(any value, number fallback) number (
+    if value == null (
+        return fallback
+    )
+    number result = value.toNum()
+    if result == 0 and value.toStr() != "0" (
+        return fallback
+    )
+    return result
+)
+
+def _subscriptionDailyCreditMultiplier(string tier) number (
+    string t = tier.toLower().strip()
+    if SUB_MULTIPLIERS.contains(t) (
+        return SUB_MULTIPLIERS[t].toNum()
+    )
+    return 1.0
+)
+
+def _wealthDailyCreditMultiplier(number balance) number (
+    if balance > 1000.0 (
+        return 0.0
+    )
+    if balance > 500.0 (
+        return 0.5
+    )
+    return 1.0
+)
+
+def awardDailyCredit(string username, number credit_amount) object (
+    object user = getUserData(username)
+    if user.error != null (
+        return { success: false, error: user.error.toStr() }
+    )
+    number old_balance = _safeFloat(user["sys.currency"] ?? user.currency, 0.0)
+    string tier = "Free"
+    any sub_raw = user["sys.subscription"]
+    if sub_raw != null (
+        if typeof(sub_raw) == "object" (
+            object sub_obj = sub_raw.assert(object)
+            tier = (sub_obj.tier ?? "Free").toStr()
+        )
+    )
+    number sub_multiplier = _subscriptionDailyCreditMultiplier(tier)
+    number wealth_multiplier = _wealthDailyCreditMultiplier(old_balance)
+    number base_amount = credit_amount
+    number awarded_amount = round(base_amount * sub_multiplier * wealth_multiplier * 100.0) / 100.0
+    if awarded_amount <= 0.0 (
+        return { success: true, old_balance: old_balance, new_balance: old_balance, awarded_amount: 0.0, tier: tier, sub_multiplier: sub_multiplier }
+    )
+    object result = transferCredits("rotur", username, awarded_amount, "daily credit")
+    if result.error != null (
+        return { success: false, error: result.error.toStr() }
+    )
+    number new_balance = old_balance + awarded_amount
+    return { success: true, old_balance: old_balance, new_balance: new_balance, awarded_amount: awarded_amount, tier: tier, sub_multiplier: sub_multiplier }
+)
+
+
+
+def processDailyCreditOnMessage(*Connection c, object msg, string username, array roles) (
+    string server_url = c.Get("serverUrl").toStr()
+    if server_url != DAILY_CREDITS_SERVER (
+        return
+    )
+    _loadDailyActivity()
+    number current_day = _getCurrentDay()
+    lock.Lock("daily_activity")
+    number stored_day = _daily_activity.day.toNum()
+    if stored_day != current_day (
+        _daily_activity = { day: current_day, users: {} }
+    )
+    string user_lower = username.toLower()
+    if _daily_activity.contains("users") (
+        object users = _daily_activity.users.assert(object)
+        if users.contains(user_lower) (
+            lock.Unlock("daily_activity")
+            return
+        )
+    )
+    lock.Unlock("daily_activity")
+    number credit_amount = getUserHighestRoleCredit(roles)
+    object result = awardDailyCredit(username, credit_amount)
+    if result.success.toBool() (
+        number awarded = result.awarded_amount.toNum()
+        lock.Lock("daily_activity")
+        if !_daily_activity.contains("users") (
+            _daily_activity.users = {}
+        )
+        object users = _daily_activity.users.assert(object)
+        users[user_lower] = awarded
+        _daily_activity.users = users
+        lock.Unlock("daily_activity")
+        _saveDailyActivity()
+        reactToMessage(c, msg.channel.toStr(), msg.id.toStr(), "originChats://chats.mistium.com/emojis/31")
+    ) else (
+        log "Failed to award daily credits to " ++ username ++ ": " ++ (result.error ?? "unknown").toStr()
+    )
+)
+
+def processDailyCreditsReset(*Connection c) (
+    number current_day = _getCurrentDay()
+    if _last_daily_reset_day == current_day (
+        return
+    )
+    _loadDailyActivity()
+    lock.Lock("daily_activity")
+    number stored_day = _daily_activity.day.toNum()
+    if stored_day == current_day (
+        lock.Unlock("daily_activity")
+        return
+    )
+    number users_awarded = 0.0
+    number total_credits = 0.0
+    if _daily_activity.contains("users") (
+        object users = _daily_activity.users.assert(object)
+        array user_keys = users.getKeys()
+        users_awarded = user_keys.len.toNum()
+        for i user_keys.len (
+            total_credits += users[user_keys[i].toStr()].toNum()
+        )
+    )
+    _daily_activity = { day: current_day, users: {} }
+    lock.Unlock("daily_activity")
+    _saveDailyActivity()
+    _last_daily_reset_day = current_day
+    any conn_raw = connections[DAILY_CREDITS_SERVER]
+    if typeof(conn_raw) != "*Connection" (
+        return
+    )
+    "*Connection" chat_conn = conn_raw.assert("*Connection")
+    string announcement = ""
+    if users_awarded > 0.0 (
+        announcement = "🌅 **Daily Credits Are Now Available!**\n\nA new day has begun! Yesterday, **" ++ users_awarded.toInt().toStr() ++ "** users earned daily credits.\nYesterday's Total: " ++ total_credits.toStr() ++ " credits\nUsers Rewarded: " ++ users_awarded.toInt().toStr() ++ " users\n\nSend your first message today to earn your daily credits!"
+    ) else (
+        announcement = "🌅 **Daily Credits Are Now Available!**\n\nA new day has begun! Be active today to earn your daily credits!\n\nSend your first message today to earn your daily credits!"
+    )
+    sendMessage(chat_conn, DAILY_CREDITS_CHANNEL, announcement)
+    log "Daily credits reset: Yesterday had " ++ users_awarded.toInt().toStr() ++ " users, " ++ total_credits.toStr() ++ " total credits"
+)
+
+
+def checkDailyCreditsReset(*Connection c) (
+    processDailyCreditsReset(c)
+)
+
+def checkDailyCreditsResetHelper() (
+    any dc_conn_raw = connections[DAILY_CREDITS_SERVER]
+    if typeof(dc_conn_raw) == "*Connection" (
+        "*Connection" dc_conn = dc_conn_raw.assert("*Connection")
+        processDailyCreditsReset(dc_conn)
+    )
+)

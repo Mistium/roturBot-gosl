@@ -226,7 +226,6 @@ def handleCountingMessage(*Connection c, object msg, string server_url) bool (
 def getLeaderboards(string channel_id, int top_n) object (
   object state = getChannelState(channel_id)
   object users = state.users.assert(object)
-  
   array user_list = []
   array user_keys = users.getKeys()
   for i user_keys.len (
@@ -234,71 +233,20 @@ def getLeaderboards(string channel_id, int top_n) object (
     object u = users[uid].assert(object)
     user_list.append({ user_id: uid, counts: u.counts.toNum(), fails: u.fails.toNum(), wrong_attempts: u.wrong_attempts.toNum() })
   )
-  
+  array sorted_by_counts = user_list.sortBy("counts")
   array top_counts = []
-  for i user_list.len (
-    object entry = user_list[i].assert(object)
-    number c = entry.counts.toNum()
-    int pos = 0
-    for j top_counts.len (
-      object existing = top_counts[j].assert(object)
-      if c > existing.counts.toNum() (
-        break
-      )
-      pos = pos + 1
-    )
-    if pos < top_n (
-      array before = []
-      array after = []
-      for k top_counts.len (
-        if k < pos (
-          before.append(top_counts[k])
-        ) else (
-          after.append(top_counts[k])
-        )
-      )
-      top_counts = before
-      top_counts.append(entry)
-      for k after.len (
-        if top_counts.len < top_n (
-          top_counts.append(after[k])
-        )
-      )
+  for i sorted_by_counts.len (
+    if top_counts.len < top_n (
+      top_counts.append(sorted_by_counts[i])
     )
   )
-  
+  array sorted_by_fails = user_list.sortBy("fails")
   array top_fails = []
-  for i user_list.len (
-    object entry = user_list[i].assert(object)
-    number f = entry.fails.toNum()
-    int pos = 0
-    for j top_fails.len (
-      object existing = top_fails[j].assert(object)
-      if f > existing.fails.toNum() (
-        break
-      )
-      pos = pos + 1
-    )
-    if pos < top_n (
-      array before = []
-      array after = []
-      for k top_fails.len (
-        if k < pos (
-          before.append(top_fails[k])
-        ) else (
-          after.append(top_fails[k])
-        )
-      )
-      top_fails = before
-      top_fails.append(entry)
-      for k after.len (
-        if top_fails.len < top_n (
-          top_fails.append(after[k])
-        )
-      )
+  for i sorted_by_fails.len (
+    if top_fails.len < top_n (
+      top_fails.append(sorted_by_fails[i])
     )
   )
-  
   return { top_counters: top_counts, top_failers: top_fails }
 )
 

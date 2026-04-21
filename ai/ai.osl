@@ -552,7 +552,6 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
         "params": params
       })
 
-      // log resp
 
       return resp.toStr()
 
@@ -607,7 +606,6 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
       if expr.len == 0 (
         return { error: "expression is required" }.toStr()
       )
-      // OSL does not have a math evaluator; return a note for the AI to compute
       return { note: "OSL does not support dynamic math evaluation. Expression: " ++ expr ++ " - please compute this yourself." }.toStr()
 
     case "search_messages"

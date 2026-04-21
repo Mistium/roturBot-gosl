@@ -56,6 +56,9 @@ string ACTIVITY_ROLES_FILE = "./store/activity_roles.json"
 string ACTIVITY_ANNOUNCE_CHANNEL = "general"
 
 object _activity_roles_data = {}
+object _activity_exclusions = {}
+string ACTIVITY_EXCLUSIONS_FILE = "./store/activity_exclusions.json"
+bool _activity_exclusions_loaded = false
 bool _activity_roles_loaded = false
 object _users_list_cache = {}
 object _pending_role_updates = {}
@@ -68,6 +71,28 @@ array ACTIVITY_THRESHOLDS = [
 ]
 
 array ACTIVITY_ROLE_NAMES = ["Active 100+", "Active 500+", "Active 1000+", "Active 3000+"]
+
+string DAILY_CREDITS_SERVER = "wss://chats.mistium.com"
+string DAILY_CREDITS_CHANNEL = "general"
+string DAILY_ACTIVITY_FILE = "./store/daily_activity.json"
+object _daily_activity = {}
+bool _daily_activity_loaded = false
+number _last_daily_reset_day = 0
+object ROLE_CREDITS = {
+    "Active 3000+": 3,
+    "Active 1000+": 2.5,
+    "Active 500+": 2,
+    "Active 100+": 1.5
+}
+number DEFAULT_CREDIT = 1
+object SUB_MULTIPLIERS = {
+    free: 1.0,
+    lite: 1.0,
+    plus: 1.0,
+    drive: 2.0,
+    pro: 3.0,
+    max: 3.0
+}
 
 string RECENT_LISTENED_LOCK = "recent_listened_messages"
 
@@ -103,6 +128,7 @@ import "./message_cache.osl"
 import "./helpers.osl"
 import "./memory.osl"
 import "./message_tracker.osl"
+import "./daily_credits.osl"
 import "./activity_roles.osl"
 import "./emotional_state.osl"
 import "./relationship.osl"
@@ -124,6 +150,7 @@ import "./slashes/economy/transfer.osl"
 import "./slashes/economy/subscribe.osl"
 import "./slashes/economy/unsubscribe.osl"
 import "./slashes/economy/gamble.osl"
+import "./slashes/economy/daily_credits.osl"
 
 // keys
 import "./slashes/keys/keys get.osl"
@@ -163,10 +190,12 @@ import "./slashes/counting/reset.osl"
 // misc
 import "./slashes/misc/personality.osl"
 import "./slashes/misc/tod.osl"
+import "./slashes/misc/activity_alert.osl"
 
 // slash command registration
 import "./slashes/register_account.osl"
 import "./slashes/register_economy.osl"
+import "./slashes/register_daily_credits.osl"
 import "./slashes/register_keys.osl"
 import "./slashes/register_social.osl"
 import "./slashes/register_friends.osl"
@@ -192,11 +221,13 @@ mainloop:
 
   registerAccountCommands()
   registerEconomyCommands()
+  registerDailyCreditCommands()
   registerKeysCommands()
   registerSocialCommands()
   registerFriendsCommands()
   registerStatsCommands()
   registerMiscCommands()
+  registerActivityAlertCommands()
   registerCountingCommands()
 
   for i servers.len (
@@ -215,4 +246,5 @@ mainloop:
 while true (
   wait 3600000
   checkActivityRoleDrops()
+  checkDailyCreditsResetHelper()
 )

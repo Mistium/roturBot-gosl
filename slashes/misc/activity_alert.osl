@@ -1,0 +1,8 @@
+def registerActivityAlertCommands() (
+  registerSlashCommand("activity_alert", activityAlertSlash, {
+    name: "activity_alert",
+    description: "Toggle activity alerts for role changes",
+    options: [],
+    ephemeral: true
+  })
+)

@@ -133,17 +133,14 @@ def getMessageCountsByPeriod() object (
   number hour_ago = now - (60 * 60 * 1000)
   number day_ago = now - (24 * 60 * 60 * 1000)
   number week_ago = now - (7 * 24 * 60 * 60 * 1000)
-  number month_ago = now - (30 * 24 * 60 * 60 * 1000)
 
   number hour_period = round(hour_ago / 1800000)
   number day_period = round(day_ago / 1800000)
   number week_period = round(week_ago / 1800000)
-  number month_period = round(month_ago / 1800000)
 
   object hour_counts = {}
   object day_counts = {}
   object week_counts = {}
-  object month_counts = {}
 
   array keys = _message_tracker_data.getKeys()
   for i keys.len (
@@ -181,12 +178,6 @@ def getMessageCountsByPeriod() object (
         week_counts[user] = week_counts[user].toNum() + count
       )
 
-      if key_num >= month_period (
-        if !month_counts.contains(user) (
-          month_counts[user] = 0
-        )
-        month_counts[user] = month_counts[user].toNum() + count
-      )
     )
   )
 
@@ -195,8 +186,7 @@ def getMessageCountsByPeriod() object (
   return {
     hour: hour_counts,
     day: day_counts,
-    week: week_counts,
-    month: month_counts
+    week: week_counts
   }
 )
 

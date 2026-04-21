@@ -1,0 +1,8 @@
+def registerDailyCreditCommands() (
+  registerSlashCommand("daily_credits", daily_credits, {
+    name: "daily_credits",
+    description: "Check your daily credit status and balance",
+    options: [],
+    ephemeral: true
+  })
+)

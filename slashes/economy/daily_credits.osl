@@ -1,0 +1,46 @@
+def daily_credits(*Connection c, object msg) (
+  _loadDailyActivity()
+  number current_day = _getCurrentDay()
+  string user_lower = msg.user.toStr().toLower()
+
+  lock.Lock("daily_activity")
+  bool already_claimed = false
+  number awarded_today = 0.0
+  number stored_day = _daily_activity.day.toNum()
+  if stored_day == current_day (
+    if _daily_activity.contains("users") (
+      object users = _daily_activity.users.assert(object)
+      if users.contains(user_lower) (
+        already_claimed = true
+        awarded_today = users[user_lower].toNum()
+      )
+    )
+  )
+  lock.Unlock("daily_activity")
+
+  object user = getUserData(msg.user.toStr())
+  number balance = 0.0
+  string tier = "Free"
+  if user.error == null (
+    balance = _safeFloat(user["sys.currency"] ?? user.currency, 0.0)
+    any sub_raw = user["sys.subscription"]
+    if sub_raw != null (
+      if typeof(sub_raw) == "object" (
+        object sub_obj = sub_raw.assert(object)
+        tier = (sub_obj.tier ?? "Free").toStr()
+      )
+    )
+  )
+
+  number sub_multiplier = _subscriptionDailyCreditMultiplier(tier)
+  number wealth_multiplier = _wealthDailyCreditMultiplier(balance)
+
+  string response = ""
+  if already_claimed (
+    response = "✅ You've already claimed your daily credits today! (**" ++ awarded_today.toStr() ++ "** credits earned)\n\nBalance: " ++ balance.toStr() ++ " credits\nSubscription: " ++ tier ++ " (x" ++ sub_multiplier.toStr() ++ ")\nWealth Multiplier: x" ++ wealth_multiplier.toStr() ++ "\n\nCome back tomorrow for more!"
+  ) else (
+    response = "⚡ You haven't claimed your daily credits yet! Send a message in the server to earn your daily credits automatically.\n\nBalance: " ++ balance.toStr() ++ " credits\nSubscription: " ++ tier ++ " (x" ++ sub_multiplier.toStr() ++ ")\nWealth Multiplier: x" ++ wealth_multiplier.toStr()
+  )
+
+  sendResponse(c, msg, response)
+)

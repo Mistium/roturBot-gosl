@@ -1,19 +1,16 @@
 def messages(*Connection c, object msg) (
   object counts = getMessageCountsByPeriod()
-  
+
   string user = msg.user.toStr()
   string user_lower = user.toLower()
-  
+
   number hour_count = counts.hour[user_lower].toNum()
   number day_count = counts.day[user_lower].toNum()
   number week_count = counts.week[user_lower].toNum()
-  number month_count = counts.month[user_lower].toNum()
-  
+
   string response = "Message counts for " ++ user ++ ":\n"
   response = response ++ "Past hour: " ++ hour_count.toStr() ++ "\n"
   response = response ++ "Past day: " ++ day_count.toStr() ++ "\n"
-  response = response ++ "Past week: " ++ week_count.toStr() ++ "\n"
-  response = response ++ "Past month: " ++ month_count.toStr()
-  
+  response = response ++ "Past week: " ++ week_count.toStr()
   sendResponse(c, msg, response)
 )
