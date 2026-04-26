@@ -232,29 +232,6 @@
   {
     "type": "function",
     "function": {
-      "name": "calculate",
-      "description": "Calculate a mathematical expression. Supports arithmetic, algebra, trigonometry, logarithms, and more.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "expression": {
-            "type": "string",
-            "description": "The mathematical expression to calculate. Examples: '2 + 2', 'sin(pi/2)', 'sqrt(16)'"
-          },
-          "variables": {
-            "type": "object",
-            "description": "Optional variable values for algebraic expressions. Example: {\"x\": 3, \"y\": 5}"
-          }
-        },
-        "required": [
-          "expression"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "save_memory",
       "description": "Save user preferences, facts, jokes, or context for later recall. Memories are stored per-channel.",
       "parameters": {
@@ -525,6 +502,29 @@
         },
         "required": [
           "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "javascript_eval",
+      "description": "Run JavaScript code in a safe sandbox. Use this to evaluate JavaScript expressions or calculate things.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The JavaScript code to run. Example: '2 + 2'"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Maximum execution time in milliseconds. Default: 60000, Maximum: 300000"
+          }
+        },
+        "required": [
+          "command"
         ]
       }
     }

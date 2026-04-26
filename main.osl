@@ -5,6 +5,8 @@ import "osl/crypto"
 import "osl/arrays"
 import "osl/lock"
 
+import "github.com/fastschema/qjs"
+
 string API_BASE = "https://api.rotur.dev"
 
 array recent_message_listeners = []

@@ -422,12 +422,12 @@ def formatToolDisplay(string func_name, object args) string (
     display = "getting weather for: " ++ args.location.toStr()
   ) else if func_name == "search_wikipedia" and args.contains("query") (
     display = "searching wikipedia: \"" ++ args.query.toStr() ++ "\""
-  ) else if func_name == "sandbox_bash" and args.contains("command") (
+  ) else if func_name == "javascript_eval" and args.contains("command") (
     string cmd_preview = args.command.toStr()
     if cmd_preview.len > 50 (
       cmd_preview = cmd_preview.trim(0, 47) ++ "..."
     )
-    display = "running sandbox: \"" ++ cmd_preview ++ "\""
+    display = "running javascript: \"" ++ cmd_preview ++ "\" timeout: " ++ round((args.timeout ?? "60000").toNum() / 1000) ++ "s"
   )
 
   return "Calling " ++ display
@@ -800,8 +800,23 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
         url: wiki_url
       }.toStr()
       
-      case "sandbox_bash"
-        return "This tool is a stub"
+      case "javascript_eval"
+        number timeout = args.timeout ?? 60000
+        if timeout < 0 or timeout > 300000 (
+          return { error: "timeout must be between 0 and 300000" }.toStr()
+        )
+        raw("rt, err := qjs.New(qjs.Option{MaxExecutionTime: int(timeout), MemoryLimit: 1024 * 1024})")
+        if err != null (
+          return { error: "qjs.New failed: " ++ err.toStr() }.toStr()
+        )
+        raw("defer rt.Close()")
+        string cmd = args.command.toStr()
+        raw("val, err := rt.Eval(\"eval.js\", qjs.Code(cmd))")
+        raw("defer val.Free()")
+        if err != null (
+          return err.toStr()
+        )
+        return val.toStr()
     )
     return { error: "Unknown tool: " ++ name }.toStr()
 )
