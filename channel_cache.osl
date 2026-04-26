@@ -16,17 +16,7 @@ def _cacheKey(string server_id, string channel_id) string (
 	return server_id ++ ":" ++ channel_id
 )
 
-def cacheAddMessage(string server_id, string channel_id, object msg) (
-	lock.Lock(CHANNEL_CACHE_LOCK)
-
-	string key = _cacheKey(server_id, channel_id)
-
-	if !CHANNEL_MESSAGE_CACHE.contains(key) (
-		CHANNEL_MESSAGE_CACHE[key] = []
-	)
-
-	array messages = CHANNEL_MESSAGE_CACHE[key].assert(array)
-
+def convertMessageToCache(object msg) object (
 	object msg_data = {
 		id: (msg.id ?? "").toStr(),
 		author: (msg.user ?? "unknown").toStr(),
@@ -59,6 +49,22 @@ def cacheAddMessage(string server_id, string channel_id, object msg) (
 	if msg.reactions != null and typeof(msg.reactions) == "object" (
 		msg_data.reactions = msg.reactions
 	)
+	return msg_data
+)
+
+def cacheAddMessage(string server_id, string channel_id, object msg) (
+	lock.Lock(CHANNEL_CACHE_LOCK)
+
+	string key = _cacheKey(server_id, channel_id)
+
+	if !CHANNEL_MESSAGE_CACHE.contains(key) (
+		lock.Unlock(CHANNEL_CACHE_LOCK)
+		return
+	)
+
+	array messages = CHANNEL_MESSAGE_CACHE[key].assert(array)
+
+	object msg_data = convertMessageToCache(msg)
 
 	messages.append(msg_data)
 
@@ -71,6 +77,8 @@ def cacheAddMessage(string server_id, string channel_id, object msg) (
 			new_messages.append(messages[start + idx])
 		)
 		CHANNEL_MESSAGE_CACHE[key] = new_messages
+	) else (
+		CHANNEL_MESSAGE_CACHE[key] = messages
 	)
 
 	lock.Unlock(CHANNEL_CACHE_LOCK)
@@ -82,8 +90,14 @@ def cacheGetMessages(string server_id, string channel_id, number limit) array (
 	string key = _cacheKey(server_id, channel_id)
 
 	if !CHANNEL_MESSAGE_CACHE.contains(key) (
+		array gotMessages = getMessages(connections[decodeURIComponent(server_id)].assert("*Connection"), channel_id, limit)
+		for i gotMessages.len (
+			gotMessages[i] = convertMessageToCache(gotMessages[i].assert(object))
+		)
+		CHANNEL_MESSAGE_CACHE[key] = gotMessages
+
 		lock.Unlock(CHANNEL_CACHE_LOCK)
-		return []
+		return gotMessages
 	)
 
 	array messages = CHANNEL_MESSAGE_CACHE[key].assert(array)
@@ -111,21 +125,7 @@ def cacheGetMessages(string server_id, string channel_id, number limit) array (
 )
 
 def cacheGetHistoryString(string server_id, string channel_id, number limit) string (
-	lock.Lock(CHANNEL_CACHE_LOCK)
-
-	string key = _cacheKey(server_id, channel_id)
-
-	if !CHANNEL_MESSAGE_CACHE.contains(key) (
-		lock.Unlock(CHANNEL_CACHE_LOCK)
-		return ""
-	)
-
-	array messages = CHANNEL_MESSAGE_CACHE[key].assert(array)
-
-	if messages.len == 0 (
-		lock.Unlock(CHANNEL_CACHE_LOCK)
-		return ""
-	)
+	array messages = cacheGetMessages(server_id, channel_id, limit)
 
 	number start = 0
 	if messages.len > limit (
@@ -136,7 +136,8 @@ def cacheGetHistoryString(string server_id, string channel_id, number limit) str
 
 	number count = messages.len.toNum() - start
 	number idx = 0
-	loop count (
+	// minus 2 to skip the last messages which is the prompt and "waiting for ai..."
+	loop count - 1 (
 		idx += 1
 		object msg = messages[start + idx].assert(object)
 
@@ -166,7 +167,6 @@ def cacheGetHistoryString(string server_id, string channel_id, number limit) str
 		history_lines.append(line)
 	)
 
-	lock.Unlock(CHANNEL_CACHE_LOCK)
 	return history_lines.join("\n")
 )
 

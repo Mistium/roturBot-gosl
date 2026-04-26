@@ -179,11 +179,6 @@ def fetchChannelHistory(*Connection c, string channel_id, number limit) string (
 def buildAIMessages(object user, string prompt, string personality, string channel_id, *Connection c, string server_url) array (
 	array messages = []
 
-	messages.append({
-		role: "system",
-		content: personality
-	})
-
 	string user_context = "You are talking to the rotur user named: " ++ (user.username ?? "someone")
 	user_context ++= " with display name: " ++ (user.display_name ?? user.username ?? "unknown")
 	user_context ++= ". You are chatting in " ++ channel_id ++ "."
@@ -270,9 +265,14 @@ def buildAIMessages(object user, string prompt, string personality, string chann
 		})
 	)
 
+  messages.append({
+		role: "assistant",
+		content: personality
+	})
+
 	messages.append({
 		role: "user",
-		content: prompt
+		content: prompt ++ "\n"
 	})
 
 	return messages
@@ -556,6 +556,9 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
       return resp.toStr()
 
     case "save_memory"
+      if tier == "Free" or tier == "Lite" (
+        return { error: "Memory saving is not available for this model tier" }.toStr()
+      )
       string mem_content = (args.content ?? "").toStr()
       any tags_raw = args.tags
       array mem_tags = []
@@ -580,6 +583,9 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
       return search_results.toStr()
 
     case "update_memory"
+      if tier == "Free" or tier == "Lite" (
+        return { error: "Memory updating is not available for this model tier" }.toStr()
+      )
       string update_id = (args.memory_id ?? "").toStr()
       string update_action = (args.action ?? "").toStr()
       number update_ttl = (args.new_ttl_days ?? 30).toNum()
@@ -588,6 +594,9 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
       return update_result.toStr()
 
     case "modify_relationship"
+      if tier == "Free" or tier == "Lite" (
+        return { error: "Memory updating is not available for this model tier" }.toStr()
+      )
       string rel_action = (args.action ?? "").toStr()
       string rel_username = (args.username ?? "").toStr()
       string rel_thoughts = (args.thoughts ?? "").toStr()
@@ -595,6 +604,9 @@ def callTool(*Connection c, string name, object args, string channel_id, string 
       return rel_result.toStr()
 
     case "modify_emotional_state"
+      if tier == "Free" or tier == "Lite" (
+        return { error: "Memory updating is not available for this model tier" }.toStr()
+      )
       string es_action = (args.action ?? "").toStr()
       string es_state = (args.state ?? "").toStr()
       string es_reason = (args.reason ?? "").toStr()
@@ -808,6 +820,7 @@ def processResponse(*Connection c, object reply_msg, object response, string tie
   string finish_reason = (first_choice.finish_reason ?? "").toStr()
 
   if finish_reason == "silent_exit" (
+    deleteMessage(c, reply_msg)
     return
   )
 

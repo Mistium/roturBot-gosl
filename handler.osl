@@ -75,6 +75,18 @@ def messageHandler(*Connection c, string message) (
   )
 )
 
+def waitForMessage(*Connection c, string listener) (
+  while true (
+    lock.Lock(RECENT_LISTENED_LOCK)
+    boolean has_listener = recent_listened_messages.contains(listener)
+    lock.Unlock(RECENT_LISTENED_LOCK)
+    if has_listener (
+      break
+    )
+    wait 0.1
+  )
+)
+
 def getListenedMessage(string listener) object (
   lock.Lock(RECENT_LISTENED_LOCK)
   if !recent_listened_messages.contains(listener) (
@@ -83,7 +95,7 @@ def getListenedMessage(string listener) object (
   object data = recent_listened_messages[listener]
   recent_listened_messages.delete(listener)
   lock.Unlock(RECENT_LISTENED_LOCK)
-  return rawToMsg(data)
+  return data
 )
 
 def reactToMessage(*Connection c, string channel, string message_id, string emoji) (
@@ -174,11 +186,10 @@ def sendResponse(*Connection c, object msg, string content) object (
     content: content,
     listener: listener
   })
-  while !recent_message_listeners.contains(listener) (
-    wait 0.1
-  )
-  object sent = getListenedMessage(listener)
-  return sent
+  
+  waitForMessage(c, listener)
+
+  return rawToMsg(getListenedMessage(listener))
 )
 
 def sendMessage(*Connection c, string channel_id, string content) object (
@@ -189,11 +200,10 @@ def sendMessage(*Connection c, string channel_id, string content) object (
     content: content,
     listener: listener
   })
-  while !recent_message_listeners.contains(listener) (
-    wait 0.1
-  )
-  object sent = getListenedMessage(listener)
-  return sent
+  
+  waitForMessage(c, listener)
+
+  return rawToMsg(getListenedMessage(listener))
 )
 
 def sendReply(*Connection c, object msg, string content) object (
@@ -206,15 +216,14 @@ def sendReply(*Connection c, object msg, string content) object (
     reply_to: data.id,
     listener: listener
   })
-  while !recent_message_listeners.contains(listener) (
-    wait 0.1
-  )
-  return getListenedMessage(listener)
+  
+  waitForMessage(c, listener)
+
+  return rawToMsg(getListenedMessage(listener))
 )
 
 def editMessage(*Connection c, object msg, string content) object (
   object data = rawToMsg(msg)
-  log "editMessage: channel=" ++ data.channel.toStr() ++ " id=" ++ data.id.toStr()
   string listener = randomString(20)
   c.Send({
     cmd: "message_edit",
@@ -223,8 +232,35 @@ def editMessage(*Connection c, object msg, string content) object (
     content: content,
     listener: listener
   })
-  while !recent_message_listeners.contains(listener) (
-    wait 0.1
+  
+  waitForMessage(c, listener)
+
+  return rawToMsg(getListenedMessage(listener))
+)
+
+def deleteMessage(*Connection c, object msg) (
+  c.Send({
+    cmd: "message_delete",
+    channel: msg.channel,
+    id: msg.id
+  })
+)
+
+def getMessages(*Connection c, string channel_id, number limit) array (
+  string listener = randomString(20)
+  c.Send({
+    cmd: "messages_get",
+    channel: channel_id,
+    limit: limit,
+    listener: listener
+  })
+  
+  waitForMessage(c, listener)
+
+  object msg = getListenedMessage(listener)
+
+  if typeof(msg.messages) != "array" (
+    return []
   )
-  return getListenedMessage(listener)
+  return msg.messages.assert(array)
 )

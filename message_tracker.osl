@@ -67,8 +67,8 @@ def trackMessage(string username) (
 def _cleanupOldPeriods() (
   lock.Lock("message_tracker")
 
-  number seven_days_ms = 7 * 24 * 60 * 60 * 1000
-  number cutoff = timestamp - seven_days_ms
+  number expire_ms = 8 * 24 * 60 * 60 * 1000
+  number cutoff = timestamp - expire_ms
   number cutoff_period = round(cutoff / 1800000)
 
   array keys = _message_tracker_data.getKeys()
@@ -82,14 +82,42 @@ def _cleanupOldPeriods() (
   lock.Unlock("message_tracker")
 )
 
-def getMessageCounts7Days() object (
+def getMessageCountsByUserCutoff(string username, number cutoff_period) number (
   _loadMessageTracker()
 
   lock.Lock("message_tracker")
 
-  number seven_days_ms = 7 * 24 * 60 * 60 * 1000
-  number cutoff = timestamp - seven_days_ms
-  number cutoff_period = round(cutoff / 1800000)
+  string user_lower = username.toLower()
+
+  number user_total = 0
+
+  array keys = _message_tracker_data.getKeys()
+  for i keys.len (
+    number key_num = keys[i].toStr().toNum()
+    if key_num < cutoff_period (
+      continue
+    )
+
+    any period_raw = _message_tracker_data[keys[i].toStr()]
+    if typeof(period_raw) != "object" (
+      continue
+    )
+
+    object period_data = period_raw.assert(object)
+
+    number count = period_data[user_lower].toNum()
+    user_total = user_total.toNum() + count
+  )
+
+  lock.Unlock("message_tracker")
+
+  return user_total
+)
+
+def getMessageCountsByCutoff(number cutoff_period) object (
+  _loadMessageTracker()
+
+  lock.Lock("message_tracker")
 
   object user_totals = {}
 
@@ -122,6 +150,14 @@ def getMessageCounts7Days() object (
   lock.Unlock("message_tracker")
 
   return user_totals
+)
+
+def getMessageCounts7Days() object (
+  number seven_days_ms = 7 * 24 * 60 * 60 * 1000
+  number cutoff = timestamp - seven_days_ms
+  number cutoff_period = round(cutoff / 1800000)
+
+  return getMessageCountsByCutoff(cutoff_period)
 )
 
 def getMessageCountsByPeriod() object (
@@ -188,6 +224,28 @@ def getMessageCountsByPeriod() object (
     day: day_counts,
     week: week_counts
   }
+)
+
+def getMessageCountsArray(string username) array (
+  // return an array of the past 7 days of message counts for a user, in the format [day1, day2, day3, day4, day5, day6, day7]
+
+  number dayms = 24 * 60 * 60 * 1000
+  number todayStart = floor(timestamp / dayms) * dayms
+
+  array days = []
+
+  for i 8 (
+    number cutoff = todayStart - (dayms * (i - 1))
+    days.append(getMessageCountsByUserCutoff(username, cutoff / 1800000))
+  )
+
+  array reversed = arrays.Reverse(days)
+
+  for i reversed.len (
+    days[i] = reversed[i].toNum() - reversed[i + 1].toNum()
+  )
+
+  return days
 )
 
 def getUserMessageCount7Days(string username) number (

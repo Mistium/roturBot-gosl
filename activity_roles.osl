@@ -278,8 +278,6 @@ def _performActivityRoleUpdate(*Connection c, string username, array current_rol
 
   string new_role = getActivityRoleForCount(message_count)
 
-  log "ActivityRoles: " ++ username ++ " has " ++ message_count.toStr() ++ " messages, role: " ++ (new_role ?? "none") ++ ", stored: " ++ (current_stored_role ?? "none")
-
   if new_role == current_stored_role (
     return
   )

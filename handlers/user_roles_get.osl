@@ -1,5 +1,4 @@
 def user_roles_get(*Connection c, object json, string token) (
-  log json
   string username = (json.user ?? "").toStr()
   if username == "" (
     return

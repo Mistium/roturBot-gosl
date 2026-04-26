@@ -8,9 +8,40 @@ def messages(*Connection c, object msg) (
   number day_count = counts.day[user_lower].toNum()
   number week_count = counts.week[user_lower].toNum()
 
-  string response = "Message counts for " ++ user ++ ":\n"
-  response = response ++ "Past hour: " ++ hour_count.toStr() ++ "\n"
-  response = response ++ "Past day: " ++ day_count.toStr() ++ "\n"
-  response = response ++ "Past week: " ++ week_count.toStr()
+  string response = "1h: " ++ hour_count.toStr() ++ ", 1d: " ++ day_count.toStr() ++ ", 1w: " ++ week_count.toStr()
+
+  // display a bar chart of the past 7 days
+  // each day should use # and be a max of 6 chars tall, going oldest on the left and newest on the right
+
+  array days = getMessageCountsArray(user)
+  if days.len == 0 (
+    response = "No messages found"
+  )
+
+  log days
+
+  number highest = 0
+  for i days.len (
+    number day_count = days[i].toNum()
+    if day_count > highest (
+      highest = day_count
+    )
+  )
+
+  string bar_chart = ""
+  for i 6 (
+    int divider = 7 - i
+    for j 7 (
+      number day_count = days[j].toNum()
+      if day_count / highest < divider / 7 (
+        bar_chart ++= "  "
+      ) else (
+        bar_chart ++= "##"
+      )
+    )
+    bar_chart ++= "\n"
+  )
+
+  response += "\n```\n" ++ bar_chart ++ "```"
   sendResponse(c, msg, response)
 )
